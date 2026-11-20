@@ -1,0 +1,45 @@
+# Android Studio and local SDK configuration
+.idea/
+.vscode/
+*.iml
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Gradle and Kotlin generated files
+.gradle/
+.kotlin/
+**/build/
+
+# Compiled Android artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+
+# TS10 proprietary APKs, device extractions, and diagnostic captures
+/apks/
+/debug*/
+/TS10_Diagnostic_*.txt
+/TS10_QF_Log_*.txt
+
+# Reverse-engineering working files
+/.analysis/
+/tmp/
+/tmp_*
+/classes.dex
+
+# Logs and operating-system files
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Proyecto Blender local (2,6 GB), no versionado
+ASTRA_PROYECTO/
+
+# Material personal que no debe publicarse (fotos del vehiculo con matricula, etc.)
+/private/
