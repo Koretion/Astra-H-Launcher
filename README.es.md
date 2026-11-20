@@ -112,20 +112,19 @@ Requisitos: JDK 17 y Android SDK 34.
 .\gradlew.bat assembleRelease     # APK de entrega (R8)
 ```
 
-El APK de depuración queda en `app/build/outputs/apk/debug/app-debug.apk`. El proceso de versión
-y firma de las entregas está en [Desarrollo y entrega](docs/DEVELOPMENT_AND_RELEASE.md).
+El APK de depuración queda en `app/build/outputs/apk/debug/app-debug.apk`. Ambos builds se firman
+con tu clave de depuración local de Android, así que un APK compilado por ti no se puede instalar
+encima del oficial: desinstala antes el oficial.
 
 ```text
 app/        Aplicación y pruebas unitarias
-docs/       Guía de compilación y entrega y configuración de trayectos
+docs/       Capturas del README y el script de Google Sheets para los trayectos
 ```
 
 ## Documentación
 
-- [Desarrollo y entrega](docs/DEVELOPMENT_AND_RELEASE.md): compilación, firma y publicación de
-  actualizaciones.
-- [Configuración de trayectos](docs/VEHICLE_TRACKING_SETUP.md): subida opcional a una hoja de
-  Google Sheets propia con el script de [docs/google-sheets](docs/google-sheets/Code.gs).
+- [Registro de trayectos con Google Sheets](docs/google-sheets/README.es.md): subida opcional de
+  los trayectos a una hoja propia, con avisos por Telegram.
 
 ## Seguridad y limitaciones
 

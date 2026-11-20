@@ -4,7 +4,7 @@
  * Toda la configuracion se guarda en:
  * Apps Script > Configuracion del proyecto > Propiedades de la secuencia de comandos.
  * Los nombres admitidos y sus valores predeterminados estan documentados en
- * docs/VEHICLE_TRACKING_SETUP.md. No escribas secretos dentro de este archivo.
+ * README.es.md de esta carpeta. No escribas secretos dentro de este archivo.
  *
  * Despliegue: sustituir el codigo de la implementacion existente y publicar una nueva
  * version de la Web App conservando su URL /exec. Copiar el archivo en el editor no actualiza

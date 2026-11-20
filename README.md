@@ -112,22 +112,19 @@ Requirements: JDK 17 and Android SDK 34.
 .\gradlew.bat assembleRelease     # release APK (R8)
 ```
 
-The debug APK ends up in `app/build/outputs/apk/debug/app-debug.apk`. Versioning and signing of
-releases are described in [Development and release](docs/DEVELOPMENT_AND_RELEASE.md).
+The debug APK ends up in `app/build/outputs/apk/debug/app-debug.apk`. Both builds are signed
+with your local Android debug key, so an APK you build cannot be installed over the official
+release: uninstall it first.
 
 ```text
 app/        Application and unit tests
-docs/       Build/release guide and trip-tracking setup
+docs/       README screenshots and the Google Sheets trip-tracking script
 ```
 
 ## Documentation
 
-The documentation is currently in Spanish:
-
-- [Development and release](docs/DEVELOPMENT_AND_RELEASE.md): building, signing and publishing
-  updates.
-- [Trip tracking setup](docs/VEHICLE_TRACKING_SETUP.md): optional upload to your own Google
-  Sheets spreadsheet with the script in [docs/google-sheets](docs/google-sheets/Code.gs).
+- [Trip tracking with Google Sheets](docs/google-sheets/README.md): optional upload of your trips
+  to your own spreadsheet, with Telegram notifications.
 
 ## Safety and limitations
 

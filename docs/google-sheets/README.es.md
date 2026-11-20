@@ -1,4 +1,6 @@
-# Configurar desde cero el tracker del TS10
+# Registro de trayectos con Google Sheets
+
+[English](README.md) · **Español**
 
 Esta guía prepara un sistema completo para:
 
@@ -7,11 +9,10 @@ Esta guía prepara un sistema completo para:
 3. Reintentar las subidas cuando la radio se queda sin Internet.
 4. Avisar por Telegram al iniciar y finalizar un trayecto.
 
-El código que debe copiarse en Google Apps Script está en
-[`google-sheets/Code.gs`](google-sheets/Code.gs).
+El código que debe copiarse en Google Apps Script es [`Code.gs`](Code.gs), en esta carpeta.
 
-El script sirve tanto para una hoja nueva como para actualizar la instalación
-procedente de `ESP32_A7670E`. Conserva las columnas y los datos existentes,
+El script sirve tanto para una hoja nueva como para actualizar la instalación de una
+versión anterior del receptor. Conserva las columnas y los datos existentes,
 añade al final los campos V4 que falten y crea el diario `batches`.
 
 ## 1. Requisitos
@@ -23,9 +24,8 @@ añade al final los campos V4 que falten y crea el diario `batches`.
 - Una cuenta de Google.
 - Opcionalmente, una cuenta de Telegram para recibir avisos.
 
-No es necesario mantener conectado el ESP32 ni el A7670E. La radio sustituye
-sus funciones de GPS y HTTP. Si ambos dispositivos se mantienen activos, deben
-usar identificadores diferentes.
+Si otro dispositivo sube también a la misma hoja, cada uno debe usar un Device ID
+distinto.
 
 ## 2. Crear la hoja de cálculo
 
@@ -34,8 +34,7 @@ usar identificadores diferentes.
 3. Ponle un nombre reconocible, por ejemplo `Trayectos Astra`.
 4. Dentro de la hoja, abre `Extensiones > Apps Script`.
 5. Borra el contenido inicial de `Code.gs`.
-6. Copia allí todo el contenido de
-   [`google-sheets/Code.gs`](google-sheets/Code.gs).
+6. Copia allí todo el contenido de [`Code.gs`](Code.gs).
 7. Guarda el proyecto.
 
 No es necesario crear manualmente las pestañas ni sus columnas. El script crea
@@ -59,11 +58,11 @@ La API key impide que cualquiera que descubra la URL pueda escribir en la hoja.
 La misma `API_KEY` se introducirá después en el TS10. No debe publicarse,
 enviarse en capturas ni escribirse directamente dentro de `Code.gs`.
 
-### Dónde trasladar el antiguo bloque `CFG`
+### Propiedades del script
 
-Ya no se pega un bloque `const CFG = {...}` con valores privados al principio
-del archivo. Cada entrada se crea como una fila independiente en
-`Configuración del proyecto > Propiedades de la secuencia de comandos`.
+Toda la configuración se guarda en `Configuración del proyecto > Propiedades de la
+secuencia de comandos`, una fila por propiedad; el código no lleva ningún bloque con
+valores privados.
 
 Solo `API_KEY` es obligatoria. Las propiedades omitidas usan estos valores:
 
@@ -104,9 +103,7 @@ Solo `API_KEY` es obligatoria. Las propiedades omitidas usan estos valores:
 | `STALE_SCAN_LOOKBACK_HOURS` | `72` | Ventana revisada por mantenimiento |
 
 `TELEGRAM_CHAT_ID` sigue admitido por compatibilidad, pero se recomienda
-`TELEGRAM_CHAT_IDS`. Los booleanos se escriben como `true` o `false`. Para
-conservar tu configuración anterior, crea una propiedad por cada línea del
-antiguo bloque y copia únicamente su valor.
+`TELEGRAM_CHAT_IDS`. Los booleanos se escriben como `true` o `false`.
 
 ## 4. Preparar las hojas y conceder permisos
 
@@ -266,9 +263,8 @@ Introduce:
 
 Activa `Registro de trayectos` y pulsa `Guardar`.
 
-El `Device ID` debe ser único. Si también se utiliza el ESP32, no debe usarse
-`ESP32C3` en la radio porque ambos dispositivos podrían generar el mismo
-`session_id`.
+El `Device ID` debe ser único para cada dispositivo que suba a la hoja; si no, dos
+dispositivos podrían generar el mismo `session_id`.
 
 ## 8. Realizar la primera prueba
 
@@ -309,7 +305,7 @@ medio escribir.
 
 ### Actualización desde una versión anterior
 
-1. Sustituye todo el contenido del proyecto por el nuevo `docs/google-sheets/Code.gs`.
+1. Sustituye todo el contenido del proyecto por el nuevo [`Code.gs`](Code.gs).
 2. Ejecuta otra vez `setupTrackerSheets`; no borra datos y añade las columnas V4.
 3. Ejecuta `Tracker TS10 > Recalcular todas las sesiones (V4)`. El proceso corrige las
    métricas históricas desde los puntos almacenados y reconstruye sus rutas sin enviar
@@ -369,7 +365,7 @@ La radio está registrando correctamente, pero no puede completar la subida.
 
 Una ejecución anterior alcanzó a escribir parte de un lote, pero no su confirmación. Las
 versiones antiguas rechazaban después todos los reintentos de ese lote y bloqueaban la cola.
-Sustituye el script por `docs/google-sheets/Code.gs` y crea una nueva versión de la
+Sustituye el script por [`Code.gs`](Code.gs) y crea una nueva versión de la
 implementación Web App conservando la misma URL `/exec`. La versión actual reconoce los
 puntos ya presentes, inserta solamente los que faltan y confirma el lote completo.
 Comprueba Internet y abre la URL `/exec` en un navegador. Después usa
@@ -383,7 +379,7 @@ un cambio de tamano de lote como motivo para bloquear toda la cola. La SQLite de
 se mantiene como fuente duradera, se conserva un unico `point_uid` y el ACK informa
 `reconciled_points`.
 
-Sustituye todo el Apps Script por `docs/google-sheets/Code.gs` y publica una nueva version
+Sustituye todo el Apps Script por [`Code.gs`](Code.gs) y publica una nueva version
 de la implementación existente. Abrir la URL `/exec` debe mostrar `server_version: 4`.
 Despues pulsa `Subir ahora`; no borres los datos de la aplicacion ni las hojas.
 
