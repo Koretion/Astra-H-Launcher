@@ -118,11 +118,13 @@ release: uninstall it first.
 
 ```text
 app/        Application and unit tests
-docs/       README screenshots and the Google Sheets trip-tracking script
+docs/       CAN signal table, README screenshots and the Google Sheets trip-tracking script
 ```
 
 ## Documentation
 
+- [CAN signals](docs/CAN_SIGNALS.md): every CAN frame the launcher uses, its validation status
+  and how to contribute signals from other cars.
 - [Trip tracking with Google Sheets](docs/google-sheets/README.md): optional upload of your trips
   to your own spreadsheet, with Telegram notifications.
 

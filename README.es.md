@@ -118,11 +118,13 @@ encima del oficial: desinstala antes el oficial.
 
 ```text
 app/        Aplicación y pruebas unitarias
-docs/       Capturas del README y el script de Google Sheets para los trayectos
+docs/       Tabla de señales CAN, capturas del README y el script de Google Sheets
 ```
 
 ## Documentación
 
+- [Señales CAN](docs/CAN_SIGNALS.es.md): todas las tramas CAN que usa el launcher, su estado de
+  validación y cómo contribuir señales de otros coches.
 - [Registro de trayectos con Google Sheets](docs/google-sheets/README.es.md): subida opcional de
   los trayectos a una hoja propia, con avisos por Telegram.
 
