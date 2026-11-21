@@ -34,6 +34,16 @@ Tomadas en el emulador de Android, por eso no hay datos reales del vehículo (`-
   <img src="docs/img/es/panel.png" alt="Las cuatro páginas del panel izquierdo: coche 3D, trayecto, autonomía y motor, presión de neumáticos">
 </p>
 
+<p align="center">
+  <img src="docs/img/es/driving.png" alt="Circulando: la carretera pasa bajo los botones y se difumina, en 3D claro, 3D oscuro y 2D">
+</p>
+<p align="center"><em>Circulando — 3D claro, 3D oscuro y 2D</em></p>
+
+<p align="center">
+  <img src="docs/img/es/doors.png" alt="Parado: puerta izquierda, puerta derecha, maletero y capó abiertos en el coche 3D">
+</p>
+<p align="center"><em>Parado — puertas, maletero y capó siguen al coche</em></p>
+
 | | |
 | :---: | :---: |
 | <img src="docs/img/es/engine.png" alt="Ajustes de motor con el capó 3D abierto"> | <img src="docs/img/es/body.png" alt="Carrocería: puertas, maletero y capó"> |

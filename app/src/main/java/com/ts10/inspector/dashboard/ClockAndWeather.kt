@@ -75,11 +75,11 @@ private fun ClockAndWeather(
     Text(
         text = sanitizeTemperature(state.outdoorTemperature),
         color = if (state.outdoorTemperature.startsWith("--")) colors.muted else colors.primary,
-        fontSize = layout.sp(14),
-        lineHeight = layout.sp(16),
+        fontSize = layout.sp(19),
+        lineHeight = layout.sp(21),
         textAlign = TextAlign.Center,
         maxLines = 1,
-        modifier = Modifier.offset(layout.dp(226), layout.dp(78)).size(layout.dp(54), layout.dp(18)),
+        modifier = Modifier.offset(layout.dp(218), layout.dp(77)).size(layout.dp(70), layout.dp(22)),
     )
     Box(
         modifier = Modifier

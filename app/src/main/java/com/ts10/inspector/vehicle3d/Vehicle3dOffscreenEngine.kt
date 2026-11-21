@@ -27,10 +27,22 @@ internal data class Vehicle3dOffscreenState(
  * the TS10 compositor during the Filament laboratory tests. Frames are produced only while
  * something moves (parts, camera, wheels, indicators); a settled scene costs nothing.
  */
+/**
+ * Tamaño de la imagen 3D. Cubre la página del coche en el carrusel, desde la línea de la fecha hasta
+ * los puntos (308 x 237 unidades). Parado solo se dibujan las [PARKED_HEIGHT] filas inferiores, con
+ * la proporción del hueco visible bajo los botones (308 x 179); la franja superior queda del color
+ * del fondo. Al conducir se usa toda la altura y la carretera sube por debajo de los botones.
+ */
+internal object Vehicle3dFrame {
+    const val WIDTH = 480
+    const val HEIGHT = 369
+    const val PARKED_HEIGHT = 279
+}
+
 internal object Vehicle3dOffscreenEngine {
     const val MODEL_ASSET = "vehicle3d/astra_h_gtc_v45.glb"
-    private const val WIDTH = 480
-    private const val HEIGHT = 380
+    private const val WIDTH = Vehicle3dFrame.WIDTH
+    private const val HEIGHT = Vehicle3dFrame.HEIGHT
     private const val FRAME_INTERVAL_MS = 50L
     private val mutableState = MutableStateFlow(Vehicle3dOffscreenState())
     val state = mutableState.asStateFlow()

@@ -17,11 +17,9 @@ internal object DesignGrid {
     /** 47 design units scale to the measured 72 px QF Android bar on the 1280 x 720 unit. */
     const val VehicleTopIndicatorHeight = 47f
     const val RightPanelWidth = Width - VehiclePanelWidth
-    const val RightPanelModalMargin = 12f
-    const val RightPanelModalTop = SystemBarHeight + RightPanelModalMargin
+    /** 10,5 unidades = 16 px en la TS10 de 1280 x 720 (escala 720 / 469). */
+    const val RightPanelModalMargin = 10.5f
     const val RightPanelModalLeft = VehiclePanelWidth + RightPanelModalMargin
-    const val RightPanelModalMaxWidth = RightPanelWidth - RightPanelModalMargin * 2f
-    const val RightPanelModalMaxHeight = Height - RightPanelModalTop - RightPanelModalMargin
 }
 
 @Immutable
@@ -41,21 +39,21 @@ internal data class RightPanelModalFrame(
     val height: Float,
 )
 
-internal fun rightPanelModalFrame(
-    width: Float = DesignGrid.RightPanelModalMaxWidth,
-    height: Float = DesignGrid.RightPanelModalMaxHeight,
-    top: Float = DesignGrid.RightPanelModalTop,
-): RightPanelModalFrame {
-    val safeWidth = width.coerceAtMost(DesignGrid.RightPanelModalMaxWidth)
-    val safeHeight = height.coerceAtMost(DesignGrid.RightPanelModalMaxHeight)
-    val x = DesignGrid.RightPanelModalLeft +
-        (DesignGrid.RightPanelModalMaxWidth - safeWidth) / 2f
-    val y = top.coerceIn(
-        DesignGrid.RightPanelModalTop,
-        DesignGrid.Height - DesignGrid.RightPanelModalMargin - safeHeight,
-    )
-    return RightPanelModalFrame(x = x, y = y, width = safeWidth, height = safeHeight)
-}
+/**
+ * Marco común de las ventanas sobre la zona derecha (clima, Aplicaciones, Teléfono, conductor,
+ * fuentes multimedia): todas del mismo tamaño, el máximo con el mismo margen a los cuatro lados
+ * para que se vea la aplicación de detrás. Ajustes es la excepción: ocupa la zona entera.
+ *
+ * [windowWidth] y [windowHeight] son el tamaño real de la ventana en unidades de diseño: la
+ * ventana empieza bajo la barra de estado y la pantalla suele ser más ancha que [DesignGrid.Width]
+ * (1280 x 720 son 834 unidades), así que no se pueden deducir de la cuadrícula.
+ */
+internal fun rightPanelModalFrame(windowWidth: Float, windowHeight: Float): RightPanelModalFrame = RightPanelModalFrame(
+    x = DesignGrid.RightPanelModalLeft,
+    y = DesignGrid.RightPanelModalMargin,
+    width = windowWidth - DesignGrid.RightPanelModalLeft - DesignGrid.RightPanelModalMargin,
+    height = windowHeight - DesignGrid.RightPanelModalMargin * 2f,
+)
 
 internal fun modalCornerShape(layout: LauncherLayout) =
     RoundedCornerShape(layout.dp(18))

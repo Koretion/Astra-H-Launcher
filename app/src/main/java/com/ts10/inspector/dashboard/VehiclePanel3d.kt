@@ -5,7 +5,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -46,15 +46,15 @@ internal fun Vehicle3dDashboardView(
     Box(
         modifier = Modifier
             .offset(y = layout.dp(RoadSceneTop))
-            .size(layout.dp(VehicleSceneWidth), layout.dp(RoadSceneHeight))
-            .background(if (darkTheme) Color.Black else Color(0xFFF3F4F6)),
+            .size(layout.dp(VehicleSceneWidth), layout.dp(VehiclePageHeight))
+            .background(if (darkTheme) Color(0xFF050607) else Color(0xFFF4F2EF)),
         contentAlignment = Alignment.Center,
     ) {
         Image(
             bitmap = bitmap,
             contentDescription = stringResource(R.string.vehicle_3d_view),
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }

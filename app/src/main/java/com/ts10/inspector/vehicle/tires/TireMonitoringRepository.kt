@@ -1,5 +1,6 @@
 package com.ts10.inspector.vehicle.tires
 
+import androidx.annotation.StringRes
 import com.ts10.inspector.ui.UiText
 import com.ts10.inspector.R
 import android.content.BroadcastReceiver
@@ -18,11 +19,11 @@ import kotlinx.coroutines.flow.update
 import java.util.Locale
 import kotlin.math.abs
 
-internal enum class TirePosition(val label: String) {
-    FRONT_LEFT("Delantera izquierda"),
-    FRONT_RIGHT("Delantera derecha"),
-    REAR_LEFT("Trasera izquierda"),
-    REAR_RIGHT("Trasera derecha"),
+internal enum class TirePosition(@StringRes val text: Int) {
+    FRONT_LEFT(R.string.tire_name_front_left),
+    FRONT_RIGHT(R.string.tire_name_front_right),
+    REAR_LEFT(R.string.tire_name_rear_left),
+    REAR_RIGHT(R.string.tire_name_rear_right),
 }
 
 internal enum class TireMonitoringMode {

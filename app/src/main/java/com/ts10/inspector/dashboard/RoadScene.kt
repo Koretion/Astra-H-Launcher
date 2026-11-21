@@ -144,7 +144,7 @@ internal fun RuntimeVehicleView(
             Modifier
                 .offset(y = layout.dp(RoadSceneTop))
                 .size(layout.dp(VehicleSceneWidth), layout.dp(RoadSceneHeight))
-                .background(if (colors.dark) Color.Black else Color(0xFFF3F4F6)),
+                .background(if (colors.dark) Color(0xFF050607) else Color(0xFFF4F2EF)),
         )
     } else {
         VehicleView(
@@ -518,7 +518,8 @@ private fun SteeringWheelIndicator(
             if (lastKnownAngle == null) foreground.copy(alpha = 0.28f) else foreground,
         ),
         modifier = Modifier
-            .offset(x = layout.dp(24), y = layout.dp(299))
+            // Abajo a la izquierda, dentro de la página del coche (termina en CarouselBottom = 336).
+            .offset(x = layout.dp(24), y = layout.dp(300))
             .size(layout.dp(29))
             .graphicsLayer { rotationZ = displayedAngle },
     )

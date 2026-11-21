@@ -304,14 +304,59 @@ internal class OffscreenGlesRenderer(
         }
     }
 
+    /**
+     * Cielo de atardecer en franjas horizontales limpiadas con tijera: un degradado sin shader.
+     * [blend] mezcla desde el color de fondo para que entre poco a poco.
+     */
+    private fun clearSunset(rows: Int, background: FloatArray, blend: Float) {
+        GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
+        val bands = SUNSET_BANDS
+        for (band in 0 until bands) {
+            val y0 = rows * band / bands
+            val y1 = rows * (band + 1) / bands
+            // GL cuenta las filas desde abajo; t = 0 arriba de la imagen, 1 abajo.
+            val t = 1f - (y0 + y1) / 2f / rows
+            val sky = sunsetColor(t)
+            GLES20.glScissor(0, y0, width, y1 - y0)
+            GLES20.glClearColor(
+                background[0] + (sky[0] - background[0]) * blend,
+                background[1] + (sky[1] - background[1]) * blend,
+                background[2] + (sky[2] - background[2]) * blend,
+                1f,
+            )
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        }
+        GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
+    }
+
+    private fun sunsetColor(t: Float): FloatArray {
+        val stops = SUNSET_STOPS
+        val index = stops.indexOfFirst { it[0] >= t }.let { if (it <= 0) 1 else it }
+        val a = stops[index - 1]
+        val b = stops[index]
+        val f = ((t - a[0]) / (b[0] - a[0])).coerceIn(0f, 1f)
+        return FloatArray(3) { a[it + 1] + (b[it + 1] - a[it + 1]) * f }
+    }
+
     fun render(input: Vehicle3dSceneInput, animator: Vehicle3dSceneAnimator, litLights: Set<String>): Bitmap {
         check(EGL14.eglMakeCurrent(display, surface, surface, context)) { "eglMakeCurrent render" }
-        GLES20.glViewport(0, 0, width, height)
+        // Parado se dibuja solo la parte inferior (el hueco visible del carrusel); al conducir la
+        // altura crece con la transición a carretera para que el encuadre no salte.
+        val parkedRows = height * Vehicle3dFrame.PARKED_HEIGHT / Vehicle3dFrame.HEIGHT
+        val roadBlend = if (input.topView) 0f else 1f - animator.showroom
+        val viewportHeight = (parkedRows + (height - parkedRows) * roadBlend).toInt().coerceIn(1, height)
+        GLES20.glViewport(0, 0, width, viewportHeight)
         val background = if (input.dark) DARK_BACKGROUND else LIGHT_BACKGROUND
         // The aerial view sits on the tyre card, so its frame is transparent and has no floor.
         GLES20.glClearColor(background[0], background[1], background[2], if (input.topView) 0f else 1f)
         val showroom = if (input.topView) 1f else animator.showroom
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+        // Desde el interior y con tema oscuro, por los cristales se ve un atardecer en vez de negro,
+        // para que el salpicadero contraste. Aparece a medida que la cámara entra (su campo visual
+        // pasa de 30° fuera a 74° dentro).
+        val cabinBlend = ((animator.orbit.fovDegrees - DEFAULT_FOV_DEGREES) / (CABIN_FOV_DEGREES - DEFAULT_FOV_DEGREES))
+            .coerceIn(0f, 1f)
+        if (input.dark && !input.topView && cabinBlend > 0f) clearSunset(viewportHeight, background, cabinBlend)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_CULL_FACE) // Blender meshes are double sided.
 
@@ -331,7 +376,7 @@ internal class OffscreenGlesRenderer(
         val viewProj = Mat4.multiply(
             // The far plane must reach the end of the road, well beyond the car; the near plane
             // stays short so the cabin view does not clip the dashboard.
-            Mat4.perspective(orbit.fovDegrees, width.toFloat() / height, 0.05f, max(radius * 12f, ROAD_FAR_METERS)),
+            Mat4.perspective(orbit.fovDegrees, width.toFloat() / viewportHeight, 0.05f, max(radius * 12f, ROAD_FAR_METERS)),
             Mat4.lookAt(eye, target),
         )
 
@@ -748,9 +793,23 @@ internal class OffscreenGlesRenderer(
         val DEFAULT_BASE = floatArrayOf(0.6f, 0.6f, 0.6f, 1f)
         val TINTED_GLASS = floatArrayOf(0.02f, 0.025f, 0.03f, 0.42f)
         val NO_EMISSION = floatArrayOf(0f, 0f, 0f)
-        val DARK_BACKGROUND = floatArrayOf(0f, 0f, 0f)
-        val LIGHT_BACKGROUND = floatArrayOf(0.953f, 0.957f, 0.965f)
+        // Mismo color que el fondo del panel (DashboardTheme): la escena se funde con él.
+        val DARK_BACKGROUND = floatArrayOf(0x05 / 255f, 0x06 / 255f, 0x07 / 255f)
+        val LIGHT_BACKGROUND = floatArrayOf(0xF4 / 255f, 0xF2 / 255f, 0xEF / 255f)
         val DARK_SKY = floatArrayOf(0.55f, 0.6f, 0.7f)
+        const val SUNSET_BANDS = 96
+        /**
+         * Posición (0 arriba, 1 abajo) y color. El parabrisas ocupa el tercio superior de la vista
+         * interior: ahí van el malva y el naranja del horizonte; debajo, tras el salpicadero, oscuro.
+         */
+        val SUNSET_STOPS = arrayOf(
+            floatArrayOf(0f, 0.10f, 0.10f, 0.26f),
+            floatArrayOf(0.09f, 0.36f, 0.18f, 0.40f),
+            floatArrayOf(0.18f, 0.88f, 0.42f, 0.30f),
+            floatArrayOf(0.25f, 1.00f, 0.66f, 0.32f),
+            floatArrayOf(0.33f, 0.20f, 0.12f, 0.12f),
+            floatArrayOf(1f, 0.05f, 0.05f, 0.06f),
+        )
         val DARK_GROUND = floatArrayOf(0.05f, 0.05f, 0.06f)
         val LIGHT_SKY = floatArrayOf(0.95f, 0.97f, 1f)
         val LIGHT_GROUND = floatArrayOf(0.35f, 0.35f, 0.37f)

@@ -112,6 +112,8 @@ internal data class Vehicle3dOrbit(
 /** The default view looks slightly below the body centre. */
 internal const val DEFAULT_TARGET_Y = -0.25f
 internal const val DEFAULT_FOV_DEGREES = 30f
+/** Gran angular del interior: ver el salpicadero entero desde la altura de la cabeza. */
+internal const val CABIN_FOV_DEGREES = 74f
 
 internal fun vehicle3dCameraTarget(input: Vehicle3dSceneInput): Vehicle3dOrbit = when {
     // 89.5° rather than 90°: lookAt with a vertical view direction has no defined screen axis.
@@ -130,21 +132,29 @@ internal fun vehicle3dCameraTarget(input: Vehicle3dSceneInput): Vehicle3dOrbit =
     input.focus == Vehicle3dFocus.ENGINE -> Vehicle3dOrbit(180f, 40f, 0.42f, targetY = 0.1f, targetZ = -0.62f)
     // Inside, between the front seats at head height, looking at the dashboard and the radio.
     // Rear three-quarter from the right, where the fuel filler is.
-    input.focus == Vehicle3dFocus.FUEL -> Vehicle3dOrbit(55f, 16f, 0.9f)
+    input.focus == Vehicle3dFocus.FUEL -> Vehicle3dOrbit(55f, 16f, SHOWROOM_DISTANCE)
     input.focus == Vehicle3dFocus.CABIN -> Vehicle3dOrbit(
         yawDegrees = 0f,
         pitchDegrees = 14f,
         distanceFactor = 0.24f,
         targetY = 0.02f,
         targetZ = -0.36f,
-        fovDegrees = 74f,
+        fovDegrees = CABIN_FOV_DEGREES,
     )
-    input.hoodOpen -> Vehicle3dOrbit(200f, 22f, 1f)
-    input.tailgateOpen -> Vehicle3dOrbit(28f, 18f, 0.85f)
-    input.doorLeftOpen -> Vehicle3dOrbit(250f, 18f, 1f)
-    input.doorRightOpen -> Vehicle3dOrbit(110f, 18f, 1f)
-    else -> Vehicle3dOrbit(215f, 14f, 1f)
+    // De frente y más alta: algo más lejos para que el paragolpes no toque el borde inferior.
+    input.hoodOpen -> Vehicle3dOrbit(200f, 22f, SHOWROOM_DISTANCE * 1.1f)
+    input.tailgateOpen -> Vehicle3dOrbit(28f, 18f, SHOWROOM_DISTANCE)
+    input.doorLeftOpen -> Vehicle3dOrbit(250f, 18f, SHOWROOM_DISTANCE)
+    input.doorRightOpen -> Vehicle3dOrbit(110f, 18f, SHOWROOM_DISTANCE)
+    else -> Vehicle3dOrbit(215f, 14f, SHOWROOM_DISTANCE)
 }
+
+/**
+ * La cámara encaja la esfera del coche en la altura de la imagen, que tiene la proporción ancha
+ * del carrusel: a distancia 1 el coche quedaba pequeño en el centro. Las vistas exteriores se
+ * acercan para que llene el hueco; el interior, el motor y la vista cenital ya están encuadrados.
+ */
+private const val SHOWROOM_DISTANCE = 0.66f
 
 private const val DRIVING_CURVE_YAW_DEGREES = 28f
 private const val DRIVING_DISTANCE = 0.95f

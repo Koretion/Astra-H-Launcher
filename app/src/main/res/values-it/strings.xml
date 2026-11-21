@@ -1011,4 +1011,8 @@
     <string name="vprofile_delete_message">Il profilo importato verrà rimosso dal launcher e si tornerà a usare quello dell\'Opel Astra H GTC. Il file originale importato non viene toccato.</string>
     <string name="vprofile_delete_confirm">ELIMINA</string>
     <string name="vprofile_open_docs">VEDI IL FORMATO SU GITHUB</string>
+    <string name="tire_name_front_left">Anteriore sinistra</string>
+    <string name="tire_name_front_right">Anteriore destra</string>
+    <string name="tire_name_rear_left">Posteriore sinistra</string>
+    <string name="tire_name_rear_right">Posteriore destra</string>
 </resources>

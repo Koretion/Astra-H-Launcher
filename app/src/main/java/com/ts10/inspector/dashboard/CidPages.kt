@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,7 +46,11 @@ import com.ts10.inspector.vehicle.tires.DdsCalibrationState
 import com.ts10.inspector.vehicle.tires.TireMonitoringRepository
 import com.ts10.inspector.vehicle.tires.TireMonitoringState
 import com.ts10.inspector.vehicle.tires.TirePosition
+import com.ts10.inspector.vehicle3d.Vehicle3dFrame
 import com.ts10.inspector.vehicle3d.Vehicle3dOffscreenEngine
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -62,7 +67,7 @@ internal fun TripCidPage(layout: LauncherLayout, colors: DashboardColors) {
     val tripEnd = if (mileage.currentTripActive) now
     else mileage.currentTripStoppedElapsedMs ?: now
     val elapsedMs = (tripEnd - mileage.currentTripStartedElapsedMs).coerceAtLeast(0L)
-    CidPageFrame(stringResource(R.string.cid_trip), layout, colors, top = 141f, height = 182f) {
+    CidPageFrame(stringResource(R.string.cid_trip), layout, colors) {
         CidPrimaryMetric(
             mileage.vehicleOdometerKm?.let { String.format(java.util.Locale.getDefault(), "%.0f", it) } ?: "--",
             stringResource(R.string.cid_odometer),
@@ -94,7 +99,7 @@ internal fun EnergyCidPage(layout: LauncherLayout, colors: DashboardColors) {
         String.format(java.util.Locale.getDefault(), "%.2f", it)
     } ?: "--"
     val consumptionUnit = if (instantConsumption != null) stringResource(R.string.cid_consumption_instant) else stringResource(R.string.cid_consumption_idle)
-    CidPageFrame(stringResource(R.string.cid_range_engine), layout, colors, top = 141f, height = 182f) {
+    CidPageFrame(stringResource(R.string.cid_range_engine), layout, colors) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             CidSecondaryMetric(fuel.rangeKm?.let { "$it km" } ?: "--", stringResource(R.string.cid_range), layout, colors)
             CidSecondaryMetric(
@@ -135,16 +140,13 @@ private fun CidPageFrame(
     title: String?,
     layout: LauncherLayout,
     colors: DashboardColors,
-    top: Float = 105f,
-    height: Float = 218f,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // Sin card: los datos van directamente sobre el fondo, dentro del hueco del carrusel.
     Column(
         modifier = Modifier
-            .offset(layout.dp(9), layout.dp(top))
-            .size(layout.dp(290), layout.dp(height))
-            .background(colors.modalBackground.copy(alpha = 0.82f), RoundedCornerShape(layout.dp(17)))
-            .padding(horizontal = layout.dp(10), vertical = layout.dp(8)),
+            .fillMaxSize()
+            .padding(horizontal = layout.dp(19), vertical = layout.dp(4)),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly,
     ) {
@@ -165,15 +167,20 @@ internal fun TireCidPage(layout: LauncherLayout, colors: DashboardColors, show3d
     val tires by TireMonitoringRepository.state.collectAsStateWithLifecycle()
     val offscreenState by Vehicle3dOffscreenEngine.state.collectAsStateWithLifecycle()
     val aerialBitmap = offscreenState.bitmap?.takeIf { show3d }
-    // The title sits at the bottom: at the top it was hidden behind the quick-action icons.
-    CidPageFrame(null, layout, colors, top = 112f, height = 211f) {
-        Box(Modifier.padding(top = layout.dp(9)).size(layout.dp(280), layout.dp(165))) {
+    // Título arriba como en las demás páginas: el carrusel ya no pasa por debajo de los botones.
+    CidPageFrame(stringResource(R.string.tire_pressure_title), layout, colors) {
+        Box(Modifier.size(layout.dp(280), layout.dp(150))) {
             // Aerial OpenGL view (nose up) like Tesla's tyre screen; the 2D diagram is the fallback.
             if (aerialBitmap != null) Image(
-                bitmap = aerialBitmap.asImageBitmap(),
+                // Solo la parte inferior: la franja de arriba es para la carretera al conducir.
+                painter = remember(aerialBitmap) {
+                    val image = aerialBitmap.asImageBitmap()
+                    val rows = image.height * Vehicle3dFrame.PARKED_HEIGHT / Vehicle3dFrame.HEIGHT
+                    BitmapPainter(image, IntOffset(0, image.height - rows), IntSize(image.width, rows))
+                },
                 contentDescription = stringResource(R.string.cid_vehicle_top_view),
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.align(Alignment.Center).size(layout.dp(200), layout.dp(160)),
+                modifier = Modifier.align(Alignment.Center).fillMaxSize(),
             ) else Canvas(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -191,19 +198,10 @@ internal fun TireCidPage(layout: LauncherLayout, colors: DashboardColors, show3d
                     )
                 }
             }
-            TirePressureLabel(TirePosition.FRONT_LEFT, stringResource(R.string.tire_front_left), tires, 0f, 8f, layout)
-            TirePressureLabel(TirePosition.FRONT_RIGHT, stringResource(R.string.tire_front_right), tires, 202f, 8f, layout)
-            TirePressureLabel(TirePosition.REAR_LEFT, stringResource(R.string.tire_rear_left), tires, 0f, 101f, layout)
-            TirePressureLabel(TirePosition.REAR_RIGHT, stringResource(R.string.tire_rear_right), tires, 202f, 101f, layout)
-            Text(
-                text = stringResource(R.string.tire_pressure_title),
-                color = colors.muted,
-                fontSize = layout.sp(10),
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier.offset(layout.dp(40), layout.dp(149)).size(layout.dp(200), layout.dp(16)),
-            )
+            TirePressureLabel(TirePosition.FRONT_LEFT, stringResource(R.string.tire_front_left), tires, 0f, 10f, layout)
+            TirePressureLabel(TirePosition.FRONT_RIGHT, stringResource(R.string.tire_front_right), tires, 202f, 10f, layout)
+            TirePressureLabel(TirePosition.REAR_LEFT, stringResource(R.string.tire_rear_left), tires, 0f, 88f, layout)
+            TirePressureLabel(TirePosition.REAR_RIGHT, stringResource(R.string.tire_rear_right), tires, 202f, 88f, layout)
         }
     }
 }
@@ -224,7 +222,8 @@ private fun TirePressureLabel(
             String.format(java.util.Locale.getDefault(), "%.1f bar", reading.pressureBar)
         deviation != null -> stringResource(R.string.tire_dds_estimate, deviation)
         state.calibrationState == DdsCalibrationState.CALIBRATING -> "${state.calibrationProgress}%"
-        else -> stringResource(R.string.common_no_data_caps)
+        // "SIN DATOS" no cabía en una línea junto a la rueda; "--" como en las demás páginas.
+        else -> "--"
     }
     // Only the value: its position next to the wheel already says which tyre it is.
     Box(

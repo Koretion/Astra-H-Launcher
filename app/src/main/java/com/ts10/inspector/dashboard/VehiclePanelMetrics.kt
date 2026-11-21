@@ -47,5 +47,15 @@ internal const val HorizonHeight = 10f
 internal const val HorizonLeft = (VehicleSceneWidth - HorizonWidth) / 2f
 
 internal const val ReferenceScale = VehicleSceneWidth / 970f
-internal const val ClimateTop = 343f
+internal const val ClimateTop = 350f
+/** Hueco del carrusel: bajo los botones de acción (113-153) y sobre los puntos de página. */
+internal const val CarouselTop = 157f
+internal const val CarouselBottom = 336f
+internal const val CarouselHeight = CarouselBottom - CarouselTop
+/**
+ * La página del coche empieza más arriba, en la línea de la fecha ([RoadSceneTop]): al conducir la
+ * carretera pasa por debajo de los botones, difuminada. Las páginas de datos usan [CarouselTop].
+ */
+internal const val VehiclePageHeight = CarouselBottom - RoadSceneTop
+internal const val PagerDotsTop = ClimateTop - 10f
 internal const val MediaTop = 379f

@@ -7,11 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -57,7 +60,6 @@ internal fun PhoneOverlay(
     val phoneState by AndroidBluetoothPhoneClient.state.collectAsStateWithLifecycle()
     var number by remember { mutableStateOf("") }
     var contactMode by remember { mutableStateOf(false) }
-    val frame = rightPanelModalFrame(width = 460f, height = 360f, top = 58f)
 
     LaunchedEffect(Unit) {
         AndroidBluetoothPhoneClient.connect(context)
@@ -69,12 +71,14 @@ internal fun PhoneOverlay(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0x66000000))
             .clickable(onClick = onDismiss),
     ) {
+        // La ventana empieza bajo la barra de estado: el marco usa su altura real.
+        val frame = rightPanelModalFrame(maxWidth.value / layout.scale, maxHeight.value / layout.scale)
         Column(
             modifier = Modifier
                 .offset(layout.dp(frame.x), layout.dp(frame.y))
@@ -85,8 +89,9 @@ internal fun PhoneOverlay(
                 .padding(horizontal = layout.dp(18), vertical = layout.dp(10)),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Alto según el contenido: con 34 fijos el aviso de conexión quedaba bajo el título.
             Row(
-                modifier = Modifier.size(layout.dp(374), layout.dp(34)),
+                modifier = Modifier.fillMaxWidth().heightIn(min = layout.dp(34)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -122,7 +127,7 @@ internal fun PhoneOverlay(
                 color = colors.muted,
                 fontSize = layout.sp(9),
                 maxLines = 1,
-                modifier = Modifier.size(layout.dp(374), layout.dp(15)),
+                modifier = Modifier.fillMaxWidth().padding(vertical = layout.dp(2)),
                 textAlign = TextAlign.Center,
             )
             if (contactMode) {

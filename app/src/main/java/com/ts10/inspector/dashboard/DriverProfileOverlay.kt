@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,14 +47,15 @@ internal fun DriverProfileOverlay(
     val profiles = remember(context) { DriverProfilePreferences.get(context) }
     val state by profiles.state.collectAsStateWithLifecycle()
     val dashboard = remember(context) { DashboardPreferences.get(context) }
-    val frame = rightPanelModalFrame(width = 460f, height = 390f, top = 62f)
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0x66000000))
             .clickable(onClick = onDismiss),
     ) {
+        // La ventana empieza bajo la barra de estado: el marco usa su altura real.
+        val frame = rightPanelModalFrame(maxWidth.value / layout.scale, maxHeight.value / layout.scale)
         Column(
             modifier = Modifier
                 .offset(layout.dp(frame.x), layout.dp(frame.y))

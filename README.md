@@ -34,6 +34,16 @@ Taken on the Android emulator, so there is no live vehicle data (`--` / *No data
   <img src="docs/img/en/panel.png" alt="The four pages of the left panel: 3D car, trip, range and engine, tyre pressure">
 </p>
 
+<p align="center">
+  <img src="docs/img/en/driving.png" alt="Driving: the road runs under the buttons and fades out, in 3D light, 3D dark and 2D">
+</p>
+<p align="center"><em>Driving — 3D light, 3D dark and 2D</em></p>
+
+<p align="center">
+  <img src="docs/img/en/doors.png" alt="Parked: left door, right door, boot and bonnet open on the 3D car">
+</p>
+<p align="center"><em>Parked — doors, boot and bonnet follow the car</em></p>
+
 | | |
 | :---: | :---: |
 | <img src="docs/img/en/engine.png" alt="Engine settings with the 3D bonnet open"> | <img src="docs/img/en/body.png" alt="Body: doors, boot and bonnet"> |

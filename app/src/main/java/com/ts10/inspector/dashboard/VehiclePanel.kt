@@ -7,7 +7,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -15,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,18 +76,23 @@ internal fun VehiclePanel(
         LauncherRuntime.state.map { it.speedKmh < VEHICLE_3D_DRIVING_KMH }.distinctUntilChanged()
     }.collectAsStateWithLifecycle(true)
     val sceneFocus = if (parked) requestedFocus else VehicleSceneFocus.NONE
-    // The tyre settings show the tyre carousel page; closing them returns to the previous page.
-    var pageBeforeTires by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(sceneFocus == VehicleSceneFocus.TIRES) {
-        if (sceneFocus == VehicleSceneFocus.TIRES) {
-            if (vehiclePager.currentPage % VEHICLE_PAGES != TIRE_PAGE) {
-                pageBeforeTires = vehiclePager.currentPage
-                val current = vehiclePager.currentPage
-                vehiclePager.animateScrollToPage(current - current % VEHICLE_PAGES + TIRE_PAGE)
-            }
-        } else {
-            pageBeforeTires?.let { vehiclePager.animateScrollToPage(it) }
-            pageBeforeTires = null
+    // Las vistas de Ajustes que mueven la cámara 3D (motor, interior, combustible) llevan a la
+    // primera página, donde está el coche; neumáticos lleva a la suya. Al cerrar Ajustes se vuelve
+    // a la página en la que se estaba antes del primer salto.
+    var pageBeforeFocus by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(sceneFocus) {
+        val targetPage = when (sceneFocus) {
+            VehicleSceneFocus.NONE -> null
+            VehicleSceneFocus.TIRES -> TIRE_PAGE
+            VehicleSceneFocus.ENGINE, VehicleSceneFocus.CABIN, VehicleSceneFocus.FUEL -> VEHICLE_PAGE
+        }
+        val current = vehiclePager.currentPage
+        if (targetPage == null) {
+            pageBeforeFocus?.let { vehiclePager.animateScrollToPage(it) }
+            pageBeforeFocus = null
+        } else if (current % VEHICLE_PAGES != targetPage) {
+            if (pageBeforeFocus == null) pageBeforeFocus = current
+            vehiclePager.animateScrollToPage(current - current % VEHICLE_PAGES + targetPage)
         }
     }
     LaunchedEffect(Unit) { VolumeInteractionDiagnostics.start(context) }
@@ -102,7 +118,7 @@ internal fun VehiclePanel(
             state = vehiclePager,
             modifier = Modifier
                 .offset(y = layout.dp(RoadSceneTop))
-                .size(layout.dp(VehicleSceneWidth), layout.dp(343 - RoadSceneTop))
+                .size(layout.dp(VehicleSceneWidth), layout.dp(VehiclePageHeight))
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         var active = false
@@ -119,20 +135,32 @@ internal fun VehiclePanel(
         ) { page ->
             Box(
                 Modifier
-                    .offset(y = -layout.dp(RoadSceneTop))
-                    .size(layout.dp(VehicleSceneWidth), layout.dp(343)),
+                    .size(layout.dp(VehicleSceneWidth), layout.dp(VehiclePageHeight))
+                    .clipToBounds(),
             ) {
                 when (page % VEHICLE_PAGES) {
-                    0 -> RuntimeVehicleView(
-                        layout,
-                        colors,
-                        settings.vehicleColorMode,
-                        settings.drivingZoomMode,
-                        settings.vehicleSceneMode,
-                    )
-                    1 -> TripCidPage(layout, colors)
-                    2 -> EnergyCidPage(layout, colors)
-                    else -> TireCidPage(layout, colors, offscreen3d)
+                    0 -> CarouselVehicleScene(layout) {
+                        RuntimeVehicleView(
+                            layout,
+                            colors,
+                            settings.vehicleColorMode,
+                            settings.drivingZoomMode,
+                            settings.vehicleSceneMode,
+                        )
+                    }
+                    // Las páginas de datos, en el hueco bajo los botones.
+                    else -> Box(
+                        Modifier
+                            .offset(y = layout.dp(CarouselTop - RoadSceneTop))
+                            .size(layout.dp(VehicleSceneWidth), layout.dp(CarouselHeight)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when (page % VEHICLE_PAGES) {
+                            1 -> TripCidPage(layout, colors)
+                            2 -> EnergyCidPage(layout, colors)
+                            else -> TireCidPage(layout, colors, offscreen3d)
+                        }
+                    }
                 }
             }
         }
@@ -155,15 +183,57 @@ internal fun VehiclePanel(
     }
 }
 
+/**
+ * La escena del coche (2D o 3D) se dibuja en coordenadas del panel desde [RoadSceneTop], tal cual:
+ * parada, la franja bajo los botones queda del color del fondo; al conducir la carretera sube por
+ * ella y se difumina hasta la línea de la fecha.
+ */
+@Composable
+private fun CarouselVehicleScene(layout: LauncherLayout, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(SceneFadeVertical, blendMode = BlendMode.DstIn)
+                drawRect(EdgeFadeHorizontal, blendMode = BlendMode.DstIn)
+            },
+    ) {
+        // Anclada arriba: si no, Compose centra una caja más alta que su padre y la escena sube.
+        Box(
+            Modifier
+                .wrapContentSize(Alignment.TopStart, unbounded = true)
+                .offset(y = -layout.dp(RoadSceneTop))
+                .requiredSize(layout.dp(VehicleSceneWidth), layout.dp(RoadSceneTop + RoadSceneHeight)),
+        ) { content() }
+    }
+}
+
+/** Transparente en la línea de la fecha, opaca al llegar bajo los botones y un borde suave abajo. */
+private val SceneFadeVertical = Brush.verticalGradient(
+    0f to Color.Transparent,
+    (CarouselTop - RoadSceneTop) / VehiclePageHeight to Color.Black,
+    0.95f to Color.Black,
+    1f to Color.Transparent,
+)
+private val EdgeFadeHorizontal = Brush.horizontalGradient(
+    0f to Color.Transparent,
+    0.06f to Color.Black,
+    0.94f to Color.Black,
+    1f to Color.Transparent,
+)
+
 private const val VEHICLE_PAGES = 4
 private const val VIRTUAL_PAGE_LOOPS = 1000
 private const val TIRE_PAGE = 3
+private const val VEHICLE_PAGE = 0
 
 @Composable
 private fun VehiclePagerDots(page: Int, layout: LauncherLayout, colors: DashboardColors) {
     Row(
         modifier = Modifier
-            .offset(layout.dp(126), layout.dp(331))
+            .offset(layout.dp(126), layout.dp(PagerDotsTop))
             .size(layout.dp(56), layout.dp(7)),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,

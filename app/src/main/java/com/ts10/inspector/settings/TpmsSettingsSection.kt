@@ -65,7 +65,7 @@ internal fun TpmsSection(layout: LauncherLayout, width: Float, height: Float) {
                     )
                     else -> stringResource(R.string.tpms_no_wheel_data)
                 }
-                MetricRow(position.label, value, source, layout)
+                MetricRow(stringResource(position.text), value, source, layout)
             }
         } }
         item { SettingsCard(layout, width) {
