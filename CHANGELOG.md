@@ -5,6 +5,22 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.3 — 2026-11-21
+
+Versión Android: `versionCode 64`, `versionName 0.5.3`.
+
+- Las tramas CAN ya no están fijadas en el código: IDs, bits y escalas se leen del perfil de
+  vehículo `vehicle_profiles/opel_astra_h_gtc.json`, para adaptar el launcher a otros coches. El
+  formato se documenta en `docs/CAN_SIGNALS.md`.
+- Nuevo **Ajustes > Sistema > Perfil del vehículo**: exporta el perfil activo, importa uno propio
+  (se valida al importarlo) y elige cuál usar. Por defecto, el del Opel Astra H GTC. El cambio se aplica
+  al momento, sin reiniciar. Borrar un perfil importado pide confirmación y
+  un enlace abre en GitHub la explicación del formato.
+- El perfil incluido se llama **Opel Astra H GTC**: sus tramas son del GTC de 3 puertas y no
+  incluye puertas ni elevalunas traseros.
+- Las etiquetas de origen de Ajustes (`SW-CAN 0x230`…) salen del perfil activo en vez de estar
+  fijadas, y se quitan los avisos "(en español)" de Log y diagnóstico y Configuración avanzada.
+
 ## 0.5.2 — 2026-11-21
 
 Versión Android: `versionCode 63`, `versionName 0.5.2`.
