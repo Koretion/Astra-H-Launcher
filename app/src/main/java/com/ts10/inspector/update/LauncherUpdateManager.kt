@@ -41,6 +41,8 @@ internal data class LauncherUpdateState(
     val status: UiText = UiText.of(R.string.upd_not_checked),
     val busy: Boolean = false,
     val progressPercent: Int = 0,
+    val downloading: Boolean = false,
+    val installing: Boolean = false,
     val availableVersion: String? = null,
     val notes: String = "",
     val downloadedVersion: String? = null,
@@ -177,7 +179,7 @@ internal object LauncherUpdateManager {
                 if (mutableState.value.downloadedVersion == null) downloadLocked(app)
             }
             val file = downloadedFile(app) ?: return@launch
-            withContext(Dispatchers.Main) { commitInstall(app, file) }
+            commitInstall(app, file)
         }
     }
 
@@ -216,6 +218,7 @@ internal object LauncherUpdateManager {
         val target = File(updatesDirectory(context), apkFileName(release.version))
         runCatching {
             setStatus(UiText.of(R.string.upd_downloading, release.version), busy = true)
+            mutableState.update { it.copy(downloading = true, progressPercent = 0) }
             val expected = parseSha256File(GithubReleases.readText(checksum))
                 ?: fail(R.string.upd_sha_unreadable)
             val actual = GithubReleases.download(apk, target, MAX_APK_BYTES) { percent ->
@@ -226,7 +229,7 @@ internal object LauncherUpdateManager {
         }.onSuccess {
             updatesDirectory(context).listFiles()?.filter { it != target }?.forEach(File::delete)
             mutableState.update {
-                it.copy(status = UiText.of(R.string.upd_ready_version, release.version), busy = false, downloadedVersion = release.version)
+                it.copy(status = UiText.of(R.string.upd_ready_version, release.version), busy = false, downloading = false, progressPercent = 0, downloadedVersion = release.version)
             }
             TelemetryLog.event("UPDATE", "launcher ${release.version} downloaded and verified")
         }.onFailure { error ->
@@ -271,15 +274,23 @@ internal object LauncherUpdateManager {
             }
             if (mutableState.value.mode != UpdateMode.INSTALL) return@launch
             val file = downloadedFile(context) ?: return@launch
-            withContext(Dispatchers.Main) { commitInstall(context, file) }
+            commitInstall(context, file)
         }
     }
 
-    private fun commitInstall(context: Context, file: File) {
+    private suspend fun commitInstall(context: Context, file: File) {
         if (LauncherRuntime.state.value.speedKmh > 0) {
             setStatus(UiText.of(R.string.upd_stop_to_install), busy = false)
             return
         }
+        setStatus(UiText.of(R.string.upd_installing_wait), busy = true)
+        mutableState.update { it.copy(installing = true) }
+        // Con root se instala sin diálogo y el launcher se reabre solo; el proceso morirá aquí.
+        if (withContext(Dispatchers.IO) { RootPackageInstaller.install(context, file) }) return
+        withContext(Dispatchers.Main) { commitPackageInstaller(context, file) }
+    }
+
+    private fun commitPackageInstaller(context: Context, file: File) {
         if (!context.packageManager.canRequestPackageInstalls()) {
             setStatus(UiText.of(R.string.upd_allow_installs), busy = false)
             openExclusiveSystemScreen(
@@ -311,6 +322,7 @@ internal object LauncherUpdateManager {
                 session.commit(callback.intentSender)
             }
             setStatus(UiText.of(R.string.upd_preparing_install), busy = true)
+            mutableState.update { it.copy(installing = true) }
         }.onFailure { error ->
             setStatus(UiText.of(R.string.upd_install_start_failed, error.uiText()), busy = false)
         }
@@ -329,7 +341,10 @@ internal object LauncherUpdateManager {
     }
 
     private fun setStatus(status: UiText, busy: Boolean) =
-        mutableState.update { it.copy(status = status, busy = busy, progressPercent = if (busy) it.progressPercent else 0) }
+        mutableState.update {
+            if (busy) it.copy(status = status, busy = true)
+            else it.copy(status = status, busy = false, progressPercent = 0, downloading = false, installing = false)
+        }
 
     private fun downloadedFile(context: Context): File? {
         val version = mutableState.value.downloadedVersion ?: return null

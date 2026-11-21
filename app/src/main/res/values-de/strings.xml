@@ -621,6 +621,9 @@
     <string name="upd_stop_to_install">Zum Installieren anhalten</string>
     <string name="upd_allow_installs">Installation von Apps durch den Launcher erlauben</string>
     <string name="upd_preparing_install">Installation wird vorbereitet…</string>
+    <string name="lupdate_downloading_percent">WIRD HERUNTERGELADEN… %1$d%%</string>
+    <string name="upd_installing_wait">Wird installiert, bitte warten…</string>
+    <string name="lupdate_installing_hint">Der Launcher schließt sich und öffnet sich danach von selbst wieder.</string>
     <string name="upd_install_start_failed">Installation konnte nicht gestartet werden: %1$s</string>
     <string name="gh_no_public_releases">Keine öffentlichen Releases</string>
     <string name="gh_http_error">GitHub antwortete %1$d</string>

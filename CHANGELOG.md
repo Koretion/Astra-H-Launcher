@@ -5,6 +5,24 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.2 — 2026-11-21
+
+Versión Android: `versionCode 63`, `versionName 0.5.2`.
+
+### Actualizaciones
+
+- Al pulsar **Descargar** o **Instalar**, la lista vuelve arriba para ver el estado y el botón
+  muestra el porcentaje de descarga.
+- Durante la instalación aparece el aviso flotante "Instalando, por favor espere…".
+- Con root real (Magisk con `su` concedido), la actualización se instala sin diálogo, el launcher
+  se reabre solo y se compila AOT para que el 3D no vaya lento tras actualizar; al terminar la
+  compilación se reinicia una vez. Sin root se mantiene el instalador de Android.
+
+### Diagnóstico
+
+- La app de Magisk instalada sin binario `su` ya no se muestra como **Root detectado**, sino
+  como **Root posible**.
+
 ## 0.5.1 — 2026-11-20
 
 Versión Android: `versionCode 62`, `versionName 0.5.1`. Primera actualización publicada para

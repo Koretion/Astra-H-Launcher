@@ -621,6 +621,9 @@
     <string name="upd_stop_to_install">Arrêtez la voiture pour installer</string>
     <string name="upd_allow_installs">Autorisez l\'installation d\'applis depuis le launcher</string>
     <string name="upd_preparing_install">Préparation de l\'installation…</string>
+    <string name="lupdate_downloading_percent">TÉLÉCHARGEMENT… %1$d%%</string>
+    <string name="upd_installing_wait">Installation en cours, veuillez patienter…</string>
+    <string name="lupdate_installing_hint">Le launcher va se fermer puis se rouvrir automatiquement.</string>
     <string name="upd_install_start_failed">Impossible de lancer l\'installation : %1$s</string>
     <string name="gh_no_public_releases">Aucune release publique</string>
     <string name="gh_http_error">GitHub a répondu %1$d</string>

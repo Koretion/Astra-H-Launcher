@@ -50,7 +50,7 @@ internal object AndroidRootChecker {
 
     private val KNOWN_SU_PATHS = setOf(
         "/system/bin/su", "/system/xbin/su", "/system/bin/.ext/.su", "/sbin/su",
-        "/su/bin/su", "/data/local/bin/su", "/data/local/xbin/su", "/data/local/su",
+        "/su/bin/su", "/debug_ramdisk/su", "/data/local/bin/su", "/data/local/xbin/su", "/data/local/su",
     )
     private val ROOT_MANAGER_PACKAGES = setOf(
         "com.topjohnwu.magisk", "eu.chainfire.supersu", "com.noshufou.android.su",
@@ -64,14 +64,13 @@ internal fun evaluateRootEvidence(
     buildTags: String,
     buildType: String,
 ): AndroidRootState {
-    val strong = buildList {
-        suPaths.forEach { add("su: $it") }
-        managerPackages.forEach { add("manager: $it") }
+    val managers = managerPackages.map { "manager: $it" }
+    if (suPaths.isNotEmpty()) {
+        return AndroidRootState(RootDetectionStatus.DETECTED, "Root detected", (suPaths.map { "su: $it" } + managers).joinToString())
     }
-    if (strong.isNotEmpty()) {
-        return AndroidRootState(RootDetectionStatus.DETECTED, "Root detected", strong.joinToString())
-    }
+    // La app de Magisk puede estar instalada sin haber parcheado el arranque: sin su no hay root.
     val weak = buildList {
+        if (managers.isNotEmpty()) add("${managers.joinToString()} without su binary")
         if ("test-keys" in buildTags) add("firmware test-keys")
         if (buildType == "eng" || buildType == "userdebug") add("build $buildType")
     }

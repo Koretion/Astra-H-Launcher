@@ -16,6 +16,12 @@ class AndroidRootCheckerTest {
         assertEquals(RootDetectionStatus.POSSIBLE, result.status)
     }
 
+    @Test fun `magisk app without su is not root`() {
+        val result = evaluateRootEvidence(emptyList(), listOf("com.topjohnwu.magisk"), "release-keys", "user")
+        assertEquals(RootDetectionStatus.POSSIBLE, result.status)
+        assertTrue(result.evidence.contains("without su"))
+    }
+
     @Test fun `no evidence does not claim definitely unrooted`() {
         val result = evaluateRootEvidence(emptyList(), emptyList(), "release-keys", "user")
         assertEquals(RootDetectionStatus.NOT_DETECTED, result.status)
