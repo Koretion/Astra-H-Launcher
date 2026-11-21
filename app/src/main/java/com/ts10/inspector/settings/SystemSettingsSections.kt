@@ -207,6 +207,7 @@ internal fun SystemSection(
     onProfiles: () -> Unit,
     onGmlanUpdate: () -> Unit,
     onLauncherUpdate: () -> Unit,
+    onVehicleProfile: () -> Unit,
 ) {
     val context = LocalContext.current
     val profiles by DriverProfilePreferences.get(context).state.collectAsStateWithLifecycle()
@@ -222,6 +223,7 @@ internal fun SystemSection(
         item { ActionRow(stringResource(R.string.system_select_launcher), stringResource(R.string.system_select_launcher_hint), layout, true) { openDefaultLauncherSelector(context) } }
         item { ActionRow(stringResource(R.string.system_android_settings), stringResource(R.string.system_android_settings_hint), layout, true) { openAndroidSystemSettings(context) } }
         item { ActionRow(stringResource(R.string.system_diagnostics), stringResource(R.string.system_diagnostics_hint), layout, true, onDiagnostics) }
+        item { ActionRow(stringResource(R.string.system_vehicle_profile), stringResource(R.string.system_vehicle_profile_hint), layout, true, onVehicleProfile) }
         item { ActionRow(stringResource(R.string.system_updates), stringResource(R.string.system_updates_hint), layout, true, onLauncherUpdate) }
         item { ActionRow(stringResource(R.string.system_gmlan_update), stringResource(R.string.system_gmlan_update_hint), layout, true, onGmlanUpdate) }
         item { ActionRow(stringResource(R.string.system_advanced), stringResource(R.string.system_advanced_hint), layout, true, onAdvanced) }

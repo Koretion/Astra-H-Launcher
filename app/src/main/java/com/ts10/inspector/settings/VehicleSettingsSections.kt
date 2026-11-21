@@ -1,5 +1,6 @@
 package com.ts10.inspector.settings
 
+import com.ts10.inspector.vehicle.can.profile.CanSignals
 import com.ts10.inspector.ui.text
 import com.ts10.inspector.R
 import androidx.compose.ui.res.stringResource
@@ -48,7 +49,7 @@ internal fun OverviewSection(layout: LauncherLayout, width: Float, height: Float
             MetricRow(stringResource(R.string.metric_engine), signals.engineRpm?.let { "${it.value} rpm" } ?: diagnostics.engineRpm.takeUnless { it == "No data" } ?: stringResource(R.string.common_no_data), signals.engineRpm?.source?.label ?: "CAN Box", layout)
             MetricRow(stringResource(R.string.metric_range), fuel.rangeKm?.let { "$it km" } ?: stringResource(R.string.common_pending), fuel.fuelSource.text(), layout)
             MetricRow(stringResource(R.string.metric_odometer), mileage.vehicleOdometerKm?.let(::formatMileage) ?: stringResource(R.string.common_pending), mileage.vehicleOdometerSource, layout)
-            MetricRow(stringResource(R.string.metric_battery_12v), can.swBatteryVoltage?.let { String.format(Locale.getDefault(), "%.2f V", it) } ?: stringResource(R.string.common_pending), "SW-CAN 0x500", layout)
+            MetricRow(stringResource(R.string.metric_battery_12v), can.swBatteryVoltage?.let { String.format(Locale.getDefault(), "%.2f V", it) } ?: stringResource(R.string.common_pending), canSource(CanSignals.BATTERY_VOLTAGE), layout)
             MetricRow(stringResource(R.string.metric_battery_maintenance), stringResource(battery.statusText), battery.replacementDate?.let { stringResource(R.string.metric_battery_replacement, formatBatteryDate(it)) } ?: stringResource(R.string.metric_no_date), layout)
         } }
         item { SettingsCard(layout, width) {
@@ -99,7 +100,7 @@ internal fun EngineSection(layout: LauncherLayout, width: Float, height: Float) 
             )
             MetricRow(stringResource(R.string.metric_air_flow), obd.massAirFlowGps?.let { String.format(Locale.getDefault(), "%.2f g/s", it) } ?: stringResource(R.string.common_pending), "OBD2 PID 10", layout)
             can.swLampFault?.let { fault ->
-                MetricRow(stringResource(R.string.metric_lighting_fault), stringResource(fault.text), "SW-CAN 0x260", layout)
+                MetricRow(stringResource(R.string.metric_lighting_fault), stringResource(fault.text), canSource(CanSignals.TURN_LAMPS), layout)
             }
             MetricRow(
                 stringResource(R.string.metric_fuel_flow),
@@ -192,41 +193,43 @@ internal fun BodySection(layout: LauncherLayout, width: Float, height: Float) {
     LazyColumn(modifier = Modifier.size(layout.dp(width), layout.dp(height))) {
         item { SectionHint(stringResource(R.string.body_hint), layout) }
         item { SettingsCard(layout, width) {
-            val doorSource = if (esp32Can.swDriverDoorOpen != null) "SW-CAN 0x230" else "CAN Box"
+            val doorSource = if (esp32Can.swDriverDoorOpen != null) canSource(CanSignals.DRIVER_DOOR_OPEN) else "CAN Box"
             MetricRow(stringResource(R.string.body_driver_door), openLabel(state.frontLeftDoorOpen), doorSource, layout)
             MetricRow(stringResource(R.string.body_passenger_door), openLabel(state.frontRightDoorOpen), doorSource, layout)
             MetricRow(stringResource(R.string.body_rear_doors), if (state.rearLeftDoorOpen || state.rearRightDoorOpen) stringResource(R.string.doors_some_open) else stringResource(R.string.doors_all_closed), "CAN Box", layout)
-            MetricRow(stringResource(R.string.body_boot), openLabel(state.trunkOpen), if (esp32Can.swTrunkOpen != null) "SW-CAN 0x230" else "CAN Box", layout)
+            MetricRow(stringResource(R.string.body_boot), openLabel(state.trunkOpen), if (esp32Can.swTrunkOpen != null) canSource(CanSignals.TRUNK_OPEN) else "CAN Box", layout)
             MetricRow(stringResource(R.string.body_bonnet), openLabel(state.bonnetOpen), "CAN Box", layout)
             MetricRow(
                 stringResource(R.string.body_central_locking),
                 esp32Can.swCentralLocked?.let { if (it) stringResource(R.string.body_locked) else stringResource(R.string.body_unlocked) } ?: stringResource(R.string.common_no_data),
-                esp32Can.swCentralLockAction?.let { stringResource(R.string.body_last_command, stringResource(it.text)) } ?: "SW-CAN 0x230/0x135",
+                esp32Can.swCentralLockAction?.let { stringResource(R.string.body_last_command, canSource(CanSignals.CENTRAL_LOCK_ACTION), stringResource(it.text)) }
+                    ?: canSource(CanSignals.CENTRAL_LOCKED, CanSignals.CENTRAL_LOCK_ACTION),
                 layout,
             )
             if (showIndividualTurnIndicators(state.hazard)) {
-                MetricRow(stringResource(R.string.body_left_indicator), if (state.leftBlinker) stringResource(R.string.common_active_m) else stringResource(R.string.common_inactive_m), "SW-CAN 0x260 / HS-CAN", layout)
-                MetricRow(stringResource(R.string.body_right_indicator), if (state.rightBlinker) stringResource(R.string.common_active_m) else stringResource(R.string.common_inactive_m), "SW-CAN 0x260 / HS-CAN", layout)
+                MetricRow(stringResource(R.string.body_left_indicator), if (state.leftBlinker) stringResource(R.string.common_active_m) else stringResource(R.string.common_inactive_m), canSource(CanSignals.TURN_LAMPS, CanSignals.TURN_STATE), layout)
+                MetricRow(stringResource(R.string.body_right_indicator), if (state.rightBlinker) stringResource(R.string.common_active_m) else stringResource(R.string.common_inactive_m), canSource(CanSignals.TURN_LAMPS, CanSignals.TURN_STATE), layout)
             }
-            MetricRow(stringResource(R.string.body_hazard), if (state.hazard) stringResource(R.string.common_active_f) else stringResource(R.string.common_inactive_f), "SW-CAN 0x260", layout)
+            MetricRow(stringResource(R.string.body_hazard), if (state.hazard) stringResource(R.string.common_active_f) else stringResource(R.string.common_inactive_f), canSource(CanSignals.TURN_LAMPS), layout)
             MetricRow(
                 stringResource(R.string.body_bulb_fault),
                 esp32Can.swLampFault?.let { stringResource(it.text) } ?: stringResource(R.string.body_not_detected),
-                stringResource(R.string.body_bulb_fault_hint),
+                stringResource(R.string.body_bulb_fault_hint, canSource(CanSignals.TURN_LAMPS)),
                 layout,
             )
-            MetricRow(stringResource(R.string.body_handbrake), if (state.handbrake) stringResource(R.string.body_engaged) else stringResource(R.string.common_released), "SW-CAN 0x370 / HS-CAN", layout)
-            MetricRow(stringResource(R.string.body_service_brake), esp32Can.swServiceBrakePressed?.let { if (it) stringResource(R.string.common_pressed) else stringResource(R.string.common_released) } ?: stringResource(R.string.common_no_data), "SW-CAN 0x360", layout)
+            MetricRow(stringResource(R.string.body_handbrake), if (state.handbrake) stringResource(R.string.body_engaged) else stringResource(R.string.common_released), canSource(CanSignals.HANDBRAKE), layout)
+            MetricRow(stringResource(R.string.body_service_brake), esp32Can.swServiceBrakePressed?.let { if (it) stringResource(R.string.common_pressed) else stringResource(R.string.common_released) } ?: stringResource(R.string.common_no_data), canSource(CanSignals.SERVICE_BRAKE), layout)
             MetricRow(
                 stringResource(R.string.body_clutch),
                 esp32Can.swClutchPressed?.let { if (it) stringResource(R.string.common_pressed) else stringResource(R.string.common_released) } ?: stringResource(R.string.common_no_data),
-                esp32Can.swPedalSwitchRaw?.let { "SW-CAN 0x115 · bruto 0x%02X".format(it) } ?: "SW-CAN 0x115",
+                esp32Can.swPedalSwitchRaw?.let { stringResource(R.string.can_raw_value, canSource(CanSignals.PEDAL_SWITCH_RAW), "0x%02X".format(it)) }
+                    ?: canSource(CanSignals.CLUTCH),
                 layout,
             )
-            MetricRow(stringResource(R.string.body_high_beam_request), if (esp32Can.swHighBeamRequest) stringResource(R.string.common_active_f) else stringResource(R.string.common_inactive_f), "SW-CAN 0x175", layout)
-            MetricRow(stringResource(R.string.body_high_beam), if (state.highBeam) stringResource(R.string.common_on_f) else stringResource(R.string.common_off_f), "HS-CAN 0x381", layout)
+            MetricRow(stringResource(R.string.body_high_beam_request), if (esp32Can.swHighBeamRequest) stringResource(R.string.common_active_f) else stringResource(R.string.common_inactive_f), canSource(CanSignals.HIGH_BEAM_REQUEST), layout)
+            MetricRow(stringResource(R.string.body_high_beam), if (state.highBeam) stringResource(R.string.common_on_f) else stringResource(R.string.common_off_f), canSource(CanSignals.HIGH_BEAM), layout)
             MetricRow(stringResource(R.string.body_lights), if (state.headlights || state.dippedBeam || state.highBeam || state.positionLights) stringResource(R.string.common_on_m) else stringResource(R.string.common_off_m), "CAN Box", layout)
-            MetricRow(stringResource(R.string.body_key_detected), esp32Can.swIgnitionKeyIndex?.let { stringResource(R.string.body_key_number, it) } ?: stringResource(R.string.common_no_data), "SW-CAN 0x425", layout)
+            MetricRow(stringResource(R.string.body_key_detected), esp32Can.swIgnitionKeyIndex?.let { stringResource(R.string.body_key_number, it) } ?: stringResource(R.string.common_no_data), canSource(CanSignals.IGNITION_KEY_INDEX), layout)
             MetricRow(
                 stringResource(R.string.body_can_candidates),
                 esp32Can.faultCandidates.size.toString(),
@@ -260,14 +263,14 @@ internal fun ComfortSection(layout: LauncherLayout, width: Float, height: Float)
         item { SettingsCard(layout, width) {
             MetricRow(stringResource(R.string.comfort_climate), if (state.climatePower == true) state.climateMode else stringResource(R.string.comfort_climate_off), "CAN Box", layout)
             MetricRow(stringResource(R.string.comfort_cabin_temp), state.cabinTemperature, "CAN Box", layout)
-            MetricRow(stringResource(R.string.comfort_outside_temp), esp32Can.swOutdoorTemperatureCelsius?.let { String.format(Locale.getDefault(), "%.1f °C", it) } ?: state.outdoorTemperature, if (esp32Can.swOutdoorTemperatureCelsius != null) "SW-CAN 0x445" else stringResource(R.string.comfort_outside_source), layout)
+            MetricRow(stringResource(R.string.comfort_outside_temp), esp32Can.swOutdoorTemperatureCelsius?.let { String.format(Locale.getDefault(), "%.1f °C", it) } ?: state.outdoorTemperature, if (esp32Can.swOutdoorTemperatureCelsius != null) canSource(CanSignals.OUTDOOR_TEMPERATURE_C) else stringResource(R.string.comfort_outside_source), layout)
             MetricRow(stringResource(R.string.comfort_fan), state.climateFanLevel?.let { stringResource(R.string.comfort_fan_level, it.toString()) } ?: stringResource(R.string.common_pending), "CAN Box", layout)
-            MetricRow(stringResource(R.string.comfort_last_window), esp32Can.swWindowAction?.let { stringResource(it.text) } ?: stringResource(R.string.common_no_activity), "SW-CAN 0x160", layout)
-            MetricRow(stringResource(R.string.comfort_wipers), esp32Can.swWiperMode?.let { stringResource(it.text) } ?: stringResource(R.string.common_no_data), "SW-CAN 0x175", layout)
+            MetricRow(stringResource(R.string.comfort_last_window), esp32Can.swWindowAction?.let { stringResource(it.text) } ?: stringResource(R.string.common_no_activity), canSource(CanSignals.WINDOW_ACTION), layout)
+            MetricRow(stringResource(R.string.comfort_wipers), esp32Can.swWiperMode?.let { stringResource(it.text) } ?: stringResource(R.string.common_no_data), canSource(CanSignals.WIPER_MODE), layout)
             MetricRow(
                 stringResource(R.string.comfort_last_central),
                 esp32Can.swCentralControlAction?.let { stringResource(it.text) } ?: stringResource(R.string.common_no_activity),
-                "SW-CAN 0x305 · SPORT/ESP confirmado",
+                canSource(CanSignals.CENTRAL_CONTROL_ACTION),
                 layout,
             )
         } }

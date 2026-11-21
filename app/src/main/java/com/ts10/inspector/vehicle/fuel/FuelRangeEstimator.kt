@@ -1,5 +1,7 @@
 package com.ts10.inspector.vehicle.fuel
 
+import com.ts10.inspector.vehicle.can.profile.CanSignals
+import com.ts10.inspector.vehicle.can.profile.VehicleCanProfiles
 import com.ts10.inspector.ui.UiText
 import com.ts10.inspector.R
 import android.content.Context
@@ -194,7 +196,7 @@ internal object FuelRangeEstimator {
                 // slowly failing sender drag the estimate down while still appearing plausible.
                 updateFuelLiters(
                     estimatedLiters,
-                    HS_FUEL_SOURCE,
+                    UiText.of(R.string.fuelsrc_hs, VehicleCanProfiles.active.sourceLabel(CanSignals.FUEL_SENDER_RAW)),
                     refreshAnchor = fuelAnchorOdometerKm == null,
                 )
             }
@@ -445,7 +447,6 @@ internal object FuelRangeEstimator {
     private const val REFUEL_MAX_STATIONARY_SPEED_KMH = 3
     private const val SENDER_SAVE_INTERVAL_MS = 60_000L
     private const val MAX_SENDER_DROP_BELOW_DISTANCE_ESTIMATE_LITERS = 3f
-    private val HS_FUEL_SOURCE = UiText.of(R.string.fuelsrc_hs)
     private val DISTANCE_FUEL_SOURCE = UiText.of(R.string.fuelsrc_distance)
     private val USER_REFUEL_SOURCE = UiText.of(R.string.fuelsrc_refuel)
 

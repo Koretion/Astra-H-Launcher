@@ -1,5 +1,6 @@
 package com.ts10.inspector.settings
 
+import com.ts10.inspector.vehicle.can.profile.CanSignals
 import com.ts10.inspector.ui.text
 import com.ts10.inspector.R
 import androidx.compose.ui.res.stringResource
@@ -83,7 +84,7 @@ internal fun EnergySection(layout: LauncherLayout, width: Float, height: Float) 
             MetricRow(
                 stringResource(R.string.energy_reserve),
                 fuel.hsLowFuel?.let { if (it) stringResource(R.string.common_active_f) else stringResource(R.string.common_inactive_f) } ?: stringResource(R.string.common_pending),
-                stringResource(R.string.energy_reserve_hint),
+                stringResource(R.string.energy_reserve_hint, canSource(CanSignals.FUEL_SENDER_RAW)),
                 layout,
             )
             fuel.lastRefuelLiters?.let { liters ->
@@ -94,11 +95,11 @@ internal fun EnergySection(layout: LauncherLayout, width: Float, height: Float) 
                     layout,
                 )
             }
-            MetricRow(stringResource(R.string.metric_battery_12v), esp32Can.swBatteryVoltage?.let { String.format(Locale.getDefault(), "%.2f V", it) } ?: stringResource(R.string.common_pending), "SW-CAN 0x500", layout)
+            MetricRow(stringResource(R.string.metric_battery_12v), esp32Can.swBatteryVoltage?.let { String.format(Locale.getDefault(), "%.2f V", it) } ?: stringResource(R.string.common_pending), canSource(CanSignals.BATTERY_VOLTAGE), layout)
             MetricRow(
                 stringResource(R.string.energy_charging_system),
                 esp32Can.swBatteryVoltage?.let { if (it >= 13.2f) stringResource(R.string.energy_charging) else stringResource(R.string.energy_not_charging) } ?: stringResource(R.string.common_pending),
-                stringResource(R.string.energy_charging_hint),
+                stringResource(R.string.energy_charging_hint, canSource(CanSignals.BATTERY_VOLTAGE)),
                 layout,
             )
         } }

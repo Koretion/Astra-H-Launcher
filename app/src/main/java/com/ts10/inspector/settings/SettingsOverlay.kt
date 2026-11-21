@@ -78,6 +78,7 @@ private enum class ControlDetail(@StringRes val title: Int) {
     PROFILES(R.string.settings_detail_profiles),
     GMLAN_UPDATE(R.string.settings_detail_gmlan_update),
     LAUNCHER_UPDATE(R.string.settings_detail_launcher_update),
+    VEHICLE_PROFILE(R.string.settings_detail_vehicle_profile),
 }
 
 private object SettingsNavigationSession {
@@ -300,6 +301,7 @@ internal fun DashboardSettingsOverlay(layout: LauncherLayout, onDismiss: () -> U
                     ControlDetail.PROFILES -> DriverProfilesSettingsPanel(settingsLayout, contentWidth, contentHeight)
                     ControlDetail.GMLAN_UPDATE -> GmlanFirmwareUpdateDetail(settingsLayout, contentWidth, contentHeight)
                     ControlDetail.LAUNCHER_UPDATE -> LauncherUpdateDetail(settingsLayout, contentWidth, contentHeight)
+                    ControlDetail.VEHICLE_PROFILE -> VehicleProfileDetail(settingsLayout, contentWidth, contentHeight)
                     null -> SettingsSectionContent(
                         section = section,
                         layout = settingsLayout,
@@ -388,6 +390,7 @@ private fun SettingsSectionContent(
             onProfiles = { onOpenDetail(ControlDetail.PROFILES) },
             onGmlanUpdate = { onOpenDetail(ControlDetail.GMLAN_UPDATE) },
             onLauncherUpdate = { onOpenDetail(ControlDetail.LAUNCHER_UPDATE) },
+            onVehicleProfile = { onOpenDetail(ControlDetail.VEHICLE_PROFILE) },
         )
     }
 }

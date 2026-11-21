@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import com.ts10.inspector.vehicle.can.profile.CanSignals
+import com.ts10.inspector.vehicle.can.profile.VehicleCanProfiles
 import java.io.Writer
 import java.util.Locale
 
@@ -23,11 +25,12 @@ internal object Esp32CanClient {
     val state: StateFlow<Esp32CanState> = mutableState.asStateFlow()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val assembler = Esp32CanChunkAssembler()
-    private val hsVehicleDecoder = HsCanVehicleDecoder()
+    private var profile = VehicleCanProfiles.active
+    private val hsVehicleDecoder = HsCanVehicleDecoder(profile)
     private val steeringMemory = SteeringAngleMemory()
-    private val swVehicleDecoder = SwCanVehicleDecoder()
-    private val msLightingDecoder = MsCanLightingDecoder()
-    private val msVehicleDecoder = MsCanVehicleDecoder()
+    private val swVehicleDecoder = SwCanVehicleDecoder(profile)
+    private val msLightingDecoder = MsCanLightingDecoder(profile)
+    private val msVehicleDecoder = MsCanVehicleDecoder(profile)
     private val faultDiscoveryTracker = CanFaultDiscoveryTracker()
     private val observedIds = linkedSetOf<Long>()
     private val captureLog = Esp32CanCaptureLog()
@@ -142,34 +145,34 @@ internal object Esp32CanClient {
         }
     }
 
+    /** Se llama en el hilo que decodifica, así el cambio de perfil no compite con una trama a medias. */
+    private fun syncProfile() {
+        val selected = VehicleCanProfiles.active
+        if (selected === profile) return
+        profile = selected
+        hsVehicleDecoder.profile = selected
+        swVehicleDecoder.profile = selected
+        msLightingDecoder.profile = selected
+        msVehicleDecoder.profile = selected
+        TelemetryLog.event("CAN_PROFILE", "active profile ${selected.id}")
+    }
+
     private fun restoreInitialState(snapshot: Esp32CanStateSnapshot) {
+        syncProfile()
         val now = SystemClock.elapsedRealtime()
         var restored = 0
         snapshot.frames.forEach { frame ->
             val live = latestLiveFrameUs[frame.bus to frame.identifier]
             // Do not splice a saved ISO-TP message into an in-progress live message.
-            if (frame.bus == Esp32CanBus.MS_CAN && frame.identifier == 0x6C8L && live != null) return@forEach
-            if (!canRestoreInitialState(frame, snapshot.timestampUs, live)) return@forEach
+            if (profile.isCodeDecoderFrame(frame, CanSignals.CLIMATE_ISOTP_DECODER) && live != null) return@forEach
+            if (!canRestoreInitialState(frame, snapshot.timestampUs, live, profile)) return@forEach
             initialStateFloorUs[frame.bus to frame.identifier] = frame.timestampUs
             hsVehicleDecoder.accept(frame)
             swVehicleDecoder.accept(frame)
             msLightingDecoder.accept(frame)
             val msUpdate = msVehicleDecoder.accept(frame)
             val measuredAt = (now - (snapshot.timestampUs - frame.timestampUs) / 1_000).coerceAtLeast(0)
-            if (frame.bus == Esp32CanBus.HS_CAN) when (frame.identifier) {
-                0x280L -> wheelSpeedUpdatedElapsedMs = measuredAt
-                0x410L -> vehicleSpeedUpdatedElapsedMs = measuredAt
-                0x110L -> engineUpdatedElapsedMs = measuredAt
-                0x381L -> bodyDynamicsUpdatedElapsedMs = now
-                0x380L -> handbrakeUpdatedElapsedMs = now
-                0x510L -> coolantUpdatedElapsedMs = measuredAt
-            }
-            if (frame.bus == Esp32CanBus.SW_CAN) when (frame.identifier) {
-                0x230L -> swBodyUpdatedElapsedMs = now
-                0x260L -> swTurnUpdatedElapsedMs = now
-                0x370L -> swHandbrakeUpdatedElapsedMs = now
-            }
-            if (frame.bus == Esp32CanBus.MS_CAN && frame.identifier == 0x450L) lightingUpdatedElapsedMs = now
+            markSourceUpdated(frame, measuredAt, now)
             when (msUpdate) {
                 MsCanVehicleUpdate.MOTION -> msMotionUpdatedElapsedMs = measuredAt
                 MsCanVehicleUpdate.CLIMATE -> msClimateUpdatedElapsedMs = now
@@ -312,6 +315,7 @@ internal object Esp32CanClient {
     }
 
     private fun handleDecodedFrame(frame: Esp32CanFrame) {
+        syncProfile()
         val frameKey = frame.bus to frame.identifier
         latestLiveFrameUs[frameKey] = maxOf(latestLiveFrameUs[frameKey] ?: 0L, frame.timestampUs)
         expectedFrameSequence?.let { expected ->
@@ -332,19 +336,19 @@ internal object Esp32CanClient {
         hsVehicleDecoder.accept(frame)
         swVehicleDecoder.accept(frame)
         val now = SystemClock.elapsedRealtime()
-        if (frame.bus == Esp32CanBus.HS_CAN && frame.identifier == 0x410L && frame.data.size >= 3) {
+        if (frame.bus == Esp32CanBus.HS_CAN && profile.carries(frame, CanSignals.VEHICLE_SPEED_KMH)) {
             hsVehicleDecoder.signals.vehicleSpeedKmh?.toInt()?.let(FuelRangeEstimator::updateCanSpeed)
         }
-        if (frame.bus == Esp32CanBus.HS_CAN && frame.identifier == 0x381L) {
+        if (frame.bus == Esp32CanBus.HS_CAN && profile.carries(frame, CanSignals.FUEL_SENDER_RAW)) {
             hsFuelUpdatedElapsedMs = now
             hsVehicleDecoder.signals.fuelRawByte?.let(FuelRangeEstimator::updateHsFuelRawByte)
         }
-        if (frame.bus == Esp32CanBus.SW_CAN && frame.identifier == 0x375L &&
+        if (frame.bus == Esp32CanBus.SW_CAN && profile.carries(frame, CanSignals.FUEL_SENDER_RAW) &&
             now - hsFuelUpdatedElapsedMs > HS_FUEL_FALLBACK_TIMEOUT_MS
         ) {
             swVehicleDecoder.signals.fuelRawByte?.let(FuelRangeEstimator::updateHsFuelRawByte)
         }
-        if (frame.bus == Esp32CanBus.HS_CAN && frame.identifier == 0x4A0L) {
+        if (frame.bus == Esp32CanBus.HS_CAN && profile.carries(frame, CanSignals.ODOMETER_KM)) {
             hsOdometerUpdatedElapsedMs = now
             hsVehicleDecoder.signals.odometerKm?.let {
                 if (it != mutableState.value.hsOdometerKm) {
@@ -352,7 +356,7 @@ internal object Esp32CanClient {
                 }
             }
         }
-        if (frame.bus == Esp32CanBus.SW_CAN && frame.identifier == 0x190L &&
+        if (frame.bus == Esp32CanBus.SW_CAN && profile.carries(frame, CanSignals.ODOMETER_KM) &&
             now - hsOdometerUpdatedElapsedMs > HS_ODOMETER_FALLBACK_TIMEOUT_MS
         ) {
             swVehicleDecoder.signals.odometerKm?.let {
@@ -363,22 +367,7 @@ internal object Esp32CanClient {
         }
         msLightingDecoder.accept(frame)
         val msUpdate = msVehicleDecoder.accept(frame)
-        if (frame.bus == Esp32CanBus.HS_CAN) when (frame.identifier) {
-            0x280L -> wheelSpeedUpdatedElapsedMs = now
-            0x410L -> vehicleSpeedUpdatedElapsedMs = now
-            0x381L -> bodyDynamicsUpdatedElapsedMs = now
-            0x380L -> handbrakeUpdatedElapsedMs = now
-            0x110L -> engineUpdatedElapsedMs = now
-            0x510L -> coolantUpdatedElapsedMs = now
-        }
-        if (frame.bus == Esp32CanBus.MS_CAN && frame.identifier == 0x450L) {
-            lightingUpdatedElapsedMs = now
-        }
-        if (frame.bus == Esp32CanBus.SW_CAN) when (frame.identifier) {
-            0x230L -> swBodyUpdatedElapsedMs = now
-            0x260L -> swTurnUpdatedElapsedMs = now
-            0x370L -> swHandbrakeUpdatedElapsedMs = now
-        }
+        markSourceUpdated(frame, now, now)
         when (msUpdate) {
             MsCanVehicleUpdate.MOTION -> msMotionUpdatedElapsedMs = now
             MsCanVehicleUpdate.CLIMATE -> msClimateUpdatedElapsedMs = now
@@ -472,6 +461,27 @@ internal object Esp32CanClient {
             localLogDrops = captureLog.droppedFrames,
         )
         publishUiIfDue(force = true)
+    }
+
+    /** Marca la frescura de cada fuente según la trama que la transporta en el perfil. */
+    private fun markSourceUpdated(frame: Esp32CanFrame, measuredAt: Long, now: Long) {
+        when (frame.bus) {
+            Esp32CanBus.HS_CAN -> {
+                if (profile.carries(frame, CanSignals.WHEEL_SPEED_FL_KMH)) wheelSpeedUpdatedElapsedMs = measuredAt
+                if (profile.carries(frame, CanSignals.VEHICLE_SPEED_KMH)) vehicleSpeedUpdatedElapsedMs = measuredAt
+                if (profile.carries(frame, CanSignals.ENGINE_RPM)) engineUpdatedElapsedMs = measuredAt
+                if (profile.carries(frame, CanSignals.TURN_STATE)) bodyDynamicsUpdatedElapsedMs = now
+                if (profile.carries(frame, CanSignals.HANDBRAKE)) handbrakeUpdatedElapsedMs = now
+                if (profile.carries(frame, CanSignals.COOLANT_C)) coolantUpdatedElapsedMs = measuredAt
+            }
+            Esp32CanBus.SW_CAN -> {
+                if (profile.carries(frame, CanSignals.DRIVER_DOOR_OPEN)) swBodyUpdatedElapsedMs = now
+                if (profile.carries(frame, CanSignals.TURN_LAMPS)) swTurnUpdatedElapsedMs = now
+                if (profile.carries(frame, CanSignals.HANDBRAKE)) swHandbrakeUpdatedElapsedMs = now
+            }
+            Esp32CanBus.MS_CAN -> if (profile.carries(frame, CanSignals.EXTERIOR_LIGHTS_ON)) lightingUpdatedElapsedMs = now
+            Esp32CanBus.UNKNOWN -> Unit
+        }
     }
 
     private fun publishUiIfDue(frame: Esp32CanFrame? = null, force: Boolean = false) {

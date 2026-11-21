@@ -1,5 +1,10 @@
 package com.ts10.inspector.vehicle.can
 
+import com.ts10.inspector.vehicle.can.profile.CanDecodedSignals
+import com.ts10.inspector.vehicle.can.profile.CanSignals
+import com.ts10.inspector.vehicle.can.profile.VehicleCanProfile
+import com.ts10.inspector.vehicle.can.profile.VehicleCanProfiles
+
 internal data class MsCanClimateSignals(
     val temperature: String,
     val automatic: Boolean,
@@ -18,8 +23,18 @@ internal data class MsCanVehicleSignals(
 
 internal enum class MsCanVehicleUpdate { MOTION, CLIMATE }
 
-/** Passive decoder for community candidates confirmed against the 9 September captures. */
-internal class MsCanVehicleDecoder {
+/**
+ * Passive MS-CAN decoder. Motion comes from the vehicle CAN profile; the climate display is an
+ * ISO-TP message reassembled here, on the frame the profile assigns to `gm_climate_isotp`.
+ */
+internal class MsCanVehicleDecoder(profile: VehicleCanProfile = VehicleCanProfiles.active) {
+    /** Al cambiar de perfil se olvida lo decodificado con el anterior. */
+    var profile: VehicleCanProfile = profile
+        set(value) {
+            field = value
+            reset()
+        }
+
     var signals = MsCanVehicleSignals()
         private set
 
@@ -34,23 +49,18 @@ internal class MsCanVehicleDecoder {
 
     fun accept(frame: Esp32CanFrame): MsCanVehicleUpdate? {
         if (frame.bus != Esp32CanBus.MS_CAN || frame.extended || frame.rtr) return null
-        return when (frame.identifier) {
-            MOTION_ID -> decodeMotion(frame)
-            CLIMATE_ID -> decodeClimateFragment(frame)
-            else -> null
-        }
+        if (profile.isCodeDecoderFrame(frame, CanSignals.CLIMATE_ISOTP_DECODER)) return decodeClimateFragment(frame)
+        return decodeMotion(profile.decode(frame))
     }
 
-    private fun decodeMotion(frame: Esp32CanFrame): MsCanVehicleUpdate? {
-        if (frame.dlc < 7 || frame.data.size < 7 || frame.data.u8(0) != 0x46) return null
-        val rawRpm = (frame.data.u8(2) shl 8) or frame.data.u8(3)
-        val rawSpeed = (frame.data.u8(4) shl 8) or frame.data.u8(5)
-        val motionState = frame.data.u8(6)
-        signals = signals.copy(
-            engineRpm = rawRpm / 4,
-            vehicleSpeedKmh = rawSpeed / 128f,
-            reverse = motionState and REVERSE_MASK != 0,
-            motionState = motionState,
+    private fun decodeMotion(decoded: CanDecodedSignals): MsCanVehicleUpdate? {
+        if (MOTION_SIGNALS.none { it in decoded }) return null
+        val current = signals
+        signals = current.copy(
+            engineRpm = decoded.int(CanSignals.ENGINE_RPM, current.engineRpm),
+            vehicleSpeedKmh = decoded.float(CanSignals.VEHICLE_SPEED_KMH, current.vehicleSpeedKmh),
+            reverse = decoded.flag(CanSignals.REVERSE, current.reverse),
+            motionState = decoded.int(CanSignals.MOTION_STATE_RAW, current.motionState),
         )
         return MsCanVehicleUpdate.MOTION
     }
@@ -157,9 +167,9 @@ internal class MsCanVehicleDecoder {
     private fun ByteArray.u8(index: Int) = this[index].toInt() and 0xff
 
     companion object {
-        const val MOTION_ID = 0x4E8L
-        const val CLIMATE_ID = 0x6C8L
-        private const val REVERSE_MASK = 0x04
+        private val MOTION_SIGNALS = listOf(
+            CanSignals.ENGINE_RPM, CanSignals.VEHICLE_SPEED_KMH, CanSignals.REVERSE, CanSignals.MOTION_STATE_RAW,
+        )
         private const val MAX_ISO_TP_PAYLOAD = 256
         private const val CLIMATE_MESSAGE_TYPE = 0x0A
         private const val FIELD_TEMPERATURE = 0x23

@@ -19,7 +19,8 @@ El launcher **solo escucha**: ninguna de estas tramas se transmite al coche.
   - **Provisional**: coincide con las capturas, pero falta repetir la prueba o cubrir todos los
     casos.
   - **Candidato**: dato de la comunidad o de capturas sin etiquetar; el launcher puede leerlo, pero no depende de él.
-- **Código**: archivo de `app/src/main/java/com/ts10/inspector/vehicle/` que lo decodifica.
+- **Código**: archivo de `app/src/main/java/com/ts10/inspector/vehicle/` que lo decodifica. Las
+  IDs, bits y escalas no están en ese código, sino en el [perfil de vehículo](#perfil-de-vehículo).
 - Las capturas se hicieron con el GMLAN-USB, un capturador propio en solo escucha que se
   publicará aparte.
 
@@ -143,7 +144,55 @@ capturas son las más útiles:
 2. Busca la ID y el bit que cambian exactamente en esos momentos y en ningún otro.
 3. Abre un *issue* o un *pull request* con: coche (modelo, año, carrocería, motor), bus, ID,
    bytes y máscara, codificación, y el fragmento de log que lo demuestra.
-4. Si cambias un decodificador, añade un test en `app/src/test/` con las tramas capturadas.
+4. Añádela al perfil y un test en `app/src/test/` con las tramas capturadas.
+
+## Perfil de vehículo
+
+Las señales de las tablas se leen de
+[`app/src/main/resources/vehicle_profiles/opel_astra_h_gtc.json`](../app/src/main/resources/vehicle_profiles/opel_astra_h_gtc.json).
+Cambiar una ID, un bit o una escala, o quitar una señal que tu coche no tiene, es editar ese
+fichero: no hace falta tocar Kotlin ni compilar.
+
+En **Ajustes > Sistema > Perfil del vehículo** se puede:
+
+- **Exportar** el perfil activo a un `.json`, como punto de partida para tu coche.
+- **Importar** un perfil editado. Se valida al importarlo: si tiene un error, se rechaza indicando
+  la trama, y el launcher sigue con el perfil que tenía. Las señales con nombres que el launcher no
+  conoce se ignoran y se avisa de ellas.
+- **Elegir** entre el perfil incluido (Opel Astra H GTC, el predeterminado) y los importados, o
+  **eliminar** un perfil importado.
+
+Cada perfil necesita un `id` propio (letras minúsculas, números, `_`, `.` o `-`); `opel_astra_h_gtc`
+está reservado para el incluido. Importar un perfil con el mismo `id` que otro importado lo
+sustituye.
+
+Cada trama:
+
+| Campo | Significado |
+| --- | --- |
+| `bus`, `id` | `HS`, `MS` o `SW`, e ID de 11 bits (`"0x230"`) |
+| `minLength`, `exactLength` | Longitud de datos mínima o exacta; si no se cumple se ignora la trama |
+| `require`, `rejectIf` | Condiciones `{ "byte", "mask", "in" }`: todas deben cumplirse / ninguna |
+| `restore` | `state` (se restaura al reconectar), `perishable` (solo si tiene menos de 3 s) o `none` |
+| `signals` | Señales de la trama |
+
+Cada señal:
+
+| Campo | Significado |
+| --- | --- |
+| `name` | Nombre que entiende el launcher (lista en `vehicle/can/profile/CanSignals.kt`) |
+| `type` | `flag`, `unsigned`, `signed` o `enum` |
+| `byte`, `length` | Primer byte (desde 0) y número de bytes big-endian; `length` vale 1 por defecto |
+| `mask` | Máscara aplicada al valor bruto |
+| `scale`, `offset` | Valor = `bruto × scale + offset` |
+| `in` | En `flag`: valores que significan verdadero; sin `in`, verdadero si no es 0 |
+| `values`, `default` | En `enum`: valor bruto → etiqueta, y etiqueta si no coincide ninguno |
+| `invalid`, `min`, `max` | Valores brutos que se descartan; con `clearWhenInvalid` la señal pasa a desconocida |
+
+Una señal que el perfil no define se queda como desconocida y la interfaz no la muestra. Las
+señales que necesitan lógica propia, como el mensaje ISO-TP del climatizador, siguen en código y el
+perfil solo indica su trama en `decoders`. Una señal nueva que el launcher aún no conoce sí
+requiere cambiar el código.
 
 Para otro modelo, como el Astra J, no basta con cambiar números: es otra plataforma de GM y
 pueden cambiar las IDs y hasta el bus en el que viaja cada dato. Usa esta tabla como guía de qué

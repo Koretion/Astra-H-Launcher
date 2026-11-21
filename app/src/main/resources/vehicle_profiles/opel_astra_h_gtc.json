@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "id": "opel_astra_h_gtc",
+  "name": "Opel Astra H GTC",
+  "notes": "Validated on an Astra H GTC (3-door): rear doors and rear windows are not included. See docs/CAN_SIGNALS.md for the evidence behind each signal.",
+  "frames": [
+    {
+      "bus": "HS", "id": "0x110", "restore": "perishable",
+      "signals": [
+        { "name": "engine_rpm", "type": "unsigned", "byte": 1, "length": 2, "scale": 0.25 }
+      ]
+    },
+    {
+      "bus": "HS", "id": "0x180", "restore": "perishable",
+      "rejectIf": [ { "byte": 0, "mask": "0xC0", "in": ["0x40"] } ],
+      "signals": [
+        { "name": "steering_angle_deg", "type": "signed", "byte": 2, "length": 2, "scale": 0.0625, "invalid": ["0x7FFF"] }
+      ]
+    },
+    {
+      "bus": "HS", "id": "0x280", "restore": "perishable",
+      "signals": [
+        { "name": "wheel_speed_fl_kmh", "type": "unsigned", "byte": 0, "length": 2, "scale": 0.029296875 },
+        { "name": "wheel_speed_fr_kmh", "type": "unsigned", "byte": 2, "length": 2, "scale": 0.029296875 },
+        { "name": "wheel_speed_rl_kmh", "type": "unsigned", "byte": 4, "length": 2, "scale": 0.029296875 },
+        { "name": "wheel_speed_rr_kmh", "type": "unsigned", "byte": 6, "length": 2, "scale": 0.029296875 }
+      ]
+    },
+    {
+      "bus": "HS", "id": "0x380", "restore": "state",
+      "signals": [
+        { "name": "handbrake", "type": "flag", "byte": 7, "mask": "0x80" }
+      ]
+    },
+    {
+      "bus": "HS", "id": "0x381", "restore": "state", "minLength": 5,
+      "signals": [
+        { "name": "turn_state", "type": "enum", "byte": 0, "mask": "0xE0", "default": "OFF",
+          "values": { "0x20": "LEFT", "0x60": "LEFT", "0x40": "RIGHT", "0x80": "RIGHT" } },
+        { "name": "exterior_lights", "type": "flag", "byte": 0, "mask": "0x08" },
+        { "name": "high_beam", "type": "flag", "byte": 4, "mask": "0x80" },
+        { "name": "fuel_sender_raw", "type": "unsigned", "byte": 5 }
+      ]
+    },
+    {
+      "bus": "HS", "id": "0x410", "restore": "perishable",
+      "signals": [
+        { "name": "vehicle_speed_kmh", "type": "unsigned", "byte": 1, "length": 2, "scale": 0.0078125 }
+      ]
+    },
+    {
+      "bus": "HS", "id": "0x4A0", "restore": "state",
+      "signals": [
+        { "name": "odometer_km", "type": "unsigned", "byte": 2, "length": 3, "scale": 0.015625 }
+      ]
+    },
+    {
+      "bus": "HS", "id": "0x510", "restore": "state",
+      "signals": [
+        { "name": "coolant_c", "type": "unsigned", "byte": 1, "offset": -40 }
+      ]
+    },
+
+    {
+      "bus": "MS", "id": "0x450", "restore": "state", "minLength": 4,
+      "require": [
+        { "byte": 0, "in": ["0x46"] },
+        { "byte": 1, "in": ["0x07"] },
+        { "byte": 2, "in": ["0x04", "0x06"] }
+      ],
+      "signals": [
+        { "name": "exterior_lights_on", "type": "flag", "byte": 3, "in": ["0x80", "0x99"] }
+      ]
+    },
+    {
+      "bus": "MS", "id": "0x4E8", "restore": "perishable", "minLength": 7,
+      "require": [ { "byte": 0, "in": ["0x46"] } ],
+      "signals": [
+        { "name": "engine_rpm", "type": "unsigned", "byte": 2, "length": 2, "scale": 0.25 },
+        { "name": "vehicle_speed_kmh", "type": "unsigned", "byte": 4, "length": 2, "scale": 0.0078125 },
+        { "name": "reverse", "type": "flag", "byte": 6, "mask": "0x04" },
+        { "name": "motion_state_raw", "type": "unsigned", "byte": 6 }
+      ]
+    },
+
+    {
+      "bus": "SW", "id": "0x115", "restore": "state", "exactLength": 1,
+      "signals": [
+        { "name": "clutch", "type": "flag", "byte": 0, "mask": "0x02" },
+        { "name": "pedal_switch_raw", "type": "unsigned", "byte": 0 }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x135", "exactLength": 4,
+      "signals": [
+        { "name": "central_lock_action", "type": "enum", "byte": 0, "length": 4,
+          "values": { "0xBC00EAA1": "LOCKING", "0x7C00EAA1": "UNLOCKING" } }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x160",
+      "signals": [
+        { "name": "window_action", "type": "enum", "byte": 1,
+          "values": { "0x10": "OPENING", "0x40": "CLOSING" } }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x175", "restore": "state",
+      "signals": [
+        { "name": "high_beam_request", "type": "flag", "byte": 0, "mask": "0x28" },
+        { "name": "wiper_mode", "type": "enum", "byte": 1, "default": "UNKNOWN",
+          "values": { "0x00": "OFF", "0xA0": "SPEED_1", "0xB0": "SPEED_2", "0xD0": "SPEED_3", "0xAA": "WASHER" } }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x190", "restore": "state",
+      "signals": [
+        { "name": "odometer_km", "type": "unsigned", "byte": 2, "length": 3, "scale": 0.015625 }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x230", "restore": "state",
+      "signals": [
+        { "name": "driver_door_open", "type": "flag", "byte": 2, "mask": "0x40" },
+        { "name": "passenger_door_open", "type": "flag", "byte": 2, "mask": "0x10" },
+        { "name": "trunk_open", "type": "flag", "byte": 2, "mask": "0x04" },
+        { "name": "central_locked", "type": "flag", "byte": 0, "length": 7, "in": ["0x05000000000900"] }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x260", "restore": "state",
+      "signals": [
+        { "name": "turn_lamps", "type": "enum", "byte": 0, "length": 3,
+          "values": {
+            "0x000000": "OFF",
+            "0x25437F": "LEFT",
+            "0x3A437F": "RIGHT",
+            "0x3A217C": "RIGHT_LAMP_FAULT",
+            "0x1F437F": "HAZARD"
+          } }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x305", "exactLength": 7,
+      "signals": [
+        { "name": "central_control_action", "type": "enum", "byte": 0, "length": 7,
+          "values": { "0x000000003A5100": "SPORT", "0x000000083B5100": "ESP" } }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x350",
+      "signals": [
+        { "name": "front_fog", "type": "flag", "byte": 0, "mask": "0x20" }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x360", "restore": "state",
+      "signals": [
+        { "name": "service_brake", "type": "flag", "byte": 2, "mask": "0x40" }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x370", "restore": "state",
+      "signals": [
+        { "name": "handbrake", "type": "flag", "byte": 1, "mask": "0x01" },
+        { "name": "rear_fog", "type": "flag", "byte": 1, "mask": "0x80" }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x375", "restore": "state",
+      "signals": [
+        { "name": "fuel_sender_raw", "type": "unsigned", "byte": 1 }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x425", "restore": "state", "exactLength": 1,
+      "signals": [
+        { "name": "ignition_key_index", "type": "unsigned", "byte": 0, "min": 1, "max": 2, "clearWhenInvalid": true }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x445", "restore": "state",
+      "signals": [
+        { "name": "outdoor_temperature_c", "type": "unsigned", "byte": 1, "scale": 0.5, "offset": -40 }
+      ]
+    },
+    {
+      "bus": "SW", "id": "0x500", "restore": "state",
+      "signals": [
+        { "name": "battery_voltage", "type": "unsigned", "byte": 1, "scale": 0.125 }
+      ]
+    }
+  ],
+  "decoders": [
+    { "name": "gm_climate_isotp", "bus": "MS", "id": "0x6C8", "restore": "state" }
+  ]
+}

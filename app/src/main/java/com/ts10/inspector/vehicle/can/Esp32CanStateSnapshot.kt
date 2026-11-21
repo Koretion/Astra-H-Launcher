@@ -1,5 +1,8 @@
 package com.ts10.inspector.vehicle.can
 
+import com.ts10.inspector.vehicle.can.profile.CanRestorePolicy
+import com.ts10.inspector.vehicle.can.profile.VehicleCanProfile
+import com.ts10.inspector.vehicle.can.profile.VehicleCanProfiles
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -56,20 +59,18 @@ internal class Esp32CanStateSnapshotAssembler {
     }
 }
 
-internal fun canRestoreInitialState(frame: Esp32CanFrame, snapshotUs: Long, liveTimestampUs: Long?): Boolean {
+internal fun canRestoreInitialState(
+    frame: Esp32CanFrame,
+    snapshotUs: Long,
+    liveTimestampUs: Long?,
+    profile: VehicleCanProfile = VehicleCanProfiles.active,
+): Boolean {
     if (frame.extended || frame.rtr || frame.timestampUs !in 0..snapshotUs) return false
     if (liveTimestampUs != null && liveTimestampUs >= frame.timestampUs) return false
-    val known = when (frame.bus) {
-        Esp32CanBus.SW_CAN -> frame.identifier in setOf(0x115L, 0x175L, 0x190L, 0x230L, 0x260L,
-            0x360L, 0x370L, 0x375L, 0x425L, 0x445L, 0x500L)
-        Esp32CanBus.HS_CAN -> frame.identifier in setOf(0x110L, 0x180L, 0x280L, 0x380L,
-            0x381L, 0x410L, 0x4A0L, 0x510L)
-        Esp32CanBus.MS_CAN -> frame.identifier in setOf(0x450L, 0x4E8L, 0x6C8L)
-        else -> false
-    }
-    if (!known) return false
     // Event-driven body/key state remains meaningful until changed. Motion is perishable.
-    val motion = frame.bus == Esp32CanBus.HS_CAN && frame.identifier in setOf(0x110L, 0x180L, 0x280L, 0x410L) ||
-        frame.bus == Esp32CanBus.MS_CAN && frame.identifier == 0x4E8L
-    return !motion || snapshotUs - frame.timestampUs <= 3_000_000L
+    return when (profile.restorePolicy(frame)) {
+        CanRestorePolicy.NONE -> false
+        CanRestorePolicy.STATE -> true
+        CanRestorePolicy.PERISHABLE -> snapshotUs - frame.timestampUs <= 3_000_000L
+    }
 }

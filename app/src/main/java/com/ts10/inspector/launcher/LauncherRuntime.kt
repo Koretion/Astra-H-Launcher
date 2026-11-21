@@ -177,6 +177,8 @@ object LauncherRuntime {
         LocationRuntime.startNavigationWatchdog()
         LocationRuntime.observeLocationSettings()
         AndroidBluetoothPhoneClient.connect(context.applicationContext)
+        // Antes del cliente CAN: así la primera trama ya se decodifica con el perfil elegido.
+        com.ts10.inspector.vehicle.can.profile.VehicleProfileManager.start(context.applicationContext)
         Esp32CanClient.start(context.applicationContext)
         VehicleStateFusion.observeEsp32VehicleSignals()
         QfDataShareBridge.start(context.applicationContext, LauncherStore.scope)

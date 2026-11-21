@@ -19,7 +19,8 @@ The launcher **only listens**: none of these frames is ever transmitted to the c
   - **Provisional**: matches the captures, but the test still has to be repeated or does not
     cover every case yet.
   - **Candidate**: community data or unlabelled captures; the launcher may read it but does not rely on it.
-- **Code**: file under `app/src/main/java/com/ts10/inspector/vehicle/` that decodes it.
+- **Code**: file under `app/src/main/java/com/ts10/inspector/vehicle/` that decodes it. IDs, bits
+  and scales are not in that code but in the [vehicle profile](#vehicle-profile).
 - Captures were taken with GMLAN-USB, our own listen-only sniffer, which will be published
   separately.
 
@@ -143,7 +144,54 @@ the most useful:
 2. Find the ID and bit that change exactly at those moments and at no other time.
 3. Open an *issue* or a *pull request* with: car (model, year, body, engine), bus, ID, bytes and
    mask, encoding, and the log excerpt that proves it.
-4. If you change a decoder, add a test under `app/src/test/` using the captured frames.
+4. Add it to the profile, plus a test under `app/src/test/` using the captured frames.
+
+## Vehicle profile
+
+The signals in the tables are read from
+[`app/src/main/resources/vehicle_profiles/opel_astra_h_gtc.json`](../app/src/main/resources/vehicle_profiles/opel_astra_h_gtc.json).
+Changing an ID, a bit or a scale, or removing a signal your car lacks, means editing that file:
+no Kotlin changes and no rebuild are needed.
+
+Under **Settings > System > Vehicle profile** you can:
+
+- **Export** the active profile to a `.json` file, as a starting point for your car.
+- **Import** an edited profile. It is validated on import: if it has an error it is rejected,
+  naming the frame, and the launcher keeps its previous profile. Signals whose names the launcher
+  does not know are ignored and reported.
+- **Choose** between the built-in profile (Opel Astra H GTC, the default) and the imported ones, or
+  **delete** an imported profile.
+
+Each profile needs its own `id` (lowercase letters, digits, `_`, `.` or `-`); `opel_astra_h_gtc` is
+reserved for the built-in one. Importing a profile with the same `id` as an imported one replaces
+it.
+
+Each frame:
+
+| Field | Meaning |
+| --- | --- |
+| `bus`, `id` | `HS`, `MS` or `SW`, and the 11-bit ID (`"0x230"`) |
+| `minLength`, `exactLength` | Minimum or exact data length; otherwise the frame is ignored |
+| `require`, `rejectIf` | `{ "byte", "mask", "in" }` conditions: all must match / none may match |
+| `restore` | `state` (restored on reconnect), `perishable` (only if under 3 s old) or `none` |
+| `signals` | Signals in the frame |
+
+Each signal:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Name the launcher understands (list in `vehicle/can/profile/CanSignals.kt`) |
+| `type` | `flag`, `unsigned`, `signed` or `enum` |
+| `byte`, `length` | First byte (0-based) and number of big-endian bytes; `length` defaults to 1 |
+| `mask` | Mask applied to the raw value |
+| `scale`, `offset` | Value = `raw × scale + offset` |
+| `in` | For `flag`: raw values meaning true; without `in`, true when non-zero |
+| `values`, `default` | For `enum`: raw value → label, and the label when none matches |
+| `invalid`, `min`, `max` | Raw values to discard; with `clearWhenInvalid` the signal becomes unknown |
+
+A signal the profile does not define stays unknown and the UI does not show it. Signals that need
+their own logic, such as the ISO-TP climate message, stay in code and the profile only names their
+frame under `decoders`. A new signal the launcher does not know yet still needs a code change.
 
 For another model, such as the Astra J, changing numbers is not enough: it is a different GM
 platform, and the IDs, and even the bus each signal travels on, may change. Use this table as a
