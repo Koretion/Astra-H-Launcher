@@ -24,7 +24,7 @@ TS10), un adaptador OBD2 ELM327 y/o el capturador GMLAN-USB (recomendado).
 > el GMLAN-USB son las del Astra H. Con otro coche siguen funcionando los datos OBD2 estándar a
 > través del ELM327.
 
-Versión actual: **0.5.3** (`versionCode 64`). Cambios en [CHANGELOG.md](CHANGELOG.md).
+Versión actual: **0.5.4** (`versionCode 65`). Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Capturas
 

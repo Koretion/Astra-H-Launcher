@@ -5,6 +5,31 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.4 — 2026-11-21
+
+Versión Android: `versionCode 65`, `versionName 0.5.4`.
+
+- Las ventanas de meteorología, Aplicaciones, Teléfono, cambio de conductor y fuentes multimedia
+  tienen el mismo tamaño: el máximo, con 16 px de margen a los cuatro lados y esquinas
+  redondeadas, para que se vea la aplicación de detrás. Ajustes sigue a pantalla completa.
+- El carrusel del panel izquierdo ya no pasa por debajo de los botones de teléfono, micro, mapa,
+  aplicaciones y cámara ni de los puntos de página. Parado, el coche 3D llena el hueco bajo los
+  botones y se funde con el fondo, sin el recuadro de la escena. Al conducir, en 3D y en 2D, la
+  carretera sube por debajo de los botones y se difumina hasta la línea de la fecha.
+- El volante dibujado baja a la esquina inferior izquierda de la escena y la temperatura junto al
+  icono del tiempo es más grande.
+- Las páginas del carrusel van sin card, la de neumáticos con el título arriba como las demás, y
+  la línea del climatizador baja un poco.
+- Abrir Motor, Interior o Combustible en Ajustes desde otra página del carrusel lleva al coche 3D
+  para ver la animación; al cerrar Ajustes se vuelve a la página anterior.
+- En la página de neumáticos, una rueda sin datos muestra `--` (antes salía "SIN" cortado).
+- En Teléfono, el aviso de conexión Bluetooth ya no queda tapado bajo el título.
+- Con tema oscuro, la vista interior (Confort) muestra un atardecer por los cristales en vez de
+  negro, para que el salpicadero contraste.
+- Ajustes > Neumáticos nombra las ruedas en el idioma elegido (salía siempre en español).
+- README: capturas nuevas con el diseño actual, más el coche circulando (3D claro, 3D oscuro y 2D)
+  y la apertura de puertas, maletero y capó.
+
 ## 0.5.3 — 2026-11-21
 
 Versión Android: `versionCode 64`, `versionName 0.5.3`.
