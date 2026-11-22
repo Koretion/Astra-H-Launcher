@@ -17,6 +17,20 @@ internal data class Vehicle3dOffscreenState(
     val frame: Long = 0,
     val renderMs: Long? = null,
     val error: String? = null,
+    val stats: Vehicle3dRenderStats = Vehicle3dRenderStats(),
+)
+
+/** Rendimiento del último minuto de animación. */
+internal data class Vehicle3dRenderStats(
+    val frames: Int = 0,
+    val fps: Float = 0f,
+    val renderAvgMs: Float = 0f,
+    val renderP95Ms: Float = 0f,
+    val renderMaxMs: Float = 0f,
+    val drawAvgMs: Float = 0f,
+    val readbackAvgMs: Float = 0f,
+    val convertAvgMs: Float = 0f,
+    val intervalAvgMs: Float = 0f,
 )
 
 /**
@@ -44,6 +58,9 @@ internal object Vehicle3dOffscreenEngine {
     private const val WIDTH = Vehicle3dFrame.WIDTH
     private const val HEIGHT = Vehicle3dFrame.HEIGHT
     private const val FRAME_INTERVAL_MS = 50L
+    private const val STATS_WINDOW_MS = 60_000L
+    // Un hueco mayor entre fotogramas se considera el comienzo de otra animación.
+    private const val ANIMATION_GAP_MS = 500L
     private val mutableState = MutableStateFlow(Vehicle3dOffscreenState())
     val state = mutableState.asStateFlow()
 
@@ -56,6 +73,20 @@ internal object Vehicle3dOffscreenEngine {
     private var loopScheduled = false
     private var lastTickMs = 0L
     private var frameNumber = 0L
+    private val samples = ArrayDeque<FrameSample>()
+    private var lastFrameStartedMs = 0L
+    private var animationStartedMs = 0L
+    private var animationFrames = 0
+    private var animationRenderMs = 0L
+
+    private class FrameSample(
+        val atMs: Long,
+        val renderMs: Float,
+        val drawMs: Float,
+        val readbackMs: Float,
+        val convertMs: Float,
+        val intervalMs: Float?,
+    )
     private var users = 0
 
     @Synchronized
@@ -108,6 +139,66 @@ internal object Vehicle3dOffscreenEngine {
         thread = null
     }
 
+    private fun recordFrame(startedMs: Long, renderNs: Long, renderer: OffscreenGlesRenderer): Vehicle3dRenderStats {
+        val renderMs = renderNs / 1_000_000f
+        val continuing = lastFrameStartedMs != 0L && startedMs - lastFrameStartedMs <= ANIMATION_GAP_MS
+        if (!continuing) {
+            animationStartedMs = startedMs
+            animationFrames = 0
+            animationRenderMs = 0L
+        }
+        samples.addLast(
+            FrameSample(
+                atMs = startedMs,
+                renderMs = renderMs,
+                drawMs = renderer.lastDrawNs / 1_000_000f,
+                readbackMs = renderer.lastReadbackNs / 1_000_000f,
+                convertMs = renderer.lastConvertNs / 1_000_000f,
+                intervalMs = if (continuing) (startedMs - lastFrameStartedMs).toFloat() else null,
+            ),
+        )
+        lastFrameStartedMs = startedMs
+        animationFrames++
+        animationRenderMs += renderNs / 1_000_000L
+        while (samples.isNotEmpty() && startedMs - samples.first().atMs > STATS_WINDOW_MS) samples.removeFirst()
+        return computeStats()
+    }
+
+    private fun computeStats(): Vehicle3dRenderStats {
+        if (samples.isEmpty()) return Vehicle3dRenderStats()
+        val renders = samples.map { it.renderMs }.sorted()
+        val intervals = samples.mapNotNull { it.intervalMs }
+        val intervalAvg = if (intervals.isEmpty()) 0f else intervals.average().toFloat()
+        return Vehicle3dRenderStats(
+            frames = samples.size,
+            fps = if (intervalAvg > 0f) 1000f / intervalAvg else 0f,
+            renderAvgMs = renders.average().toFloat(),
+            renderP95Ms = renders[((renders.size - 1) * 95) / 100],
+            renderMaxMs = renders.last(),
+            drawAvgMs = samples.map { it.drawMs }.average().toFloat(),
+            readbackAvgMs = samples.map { it.readbackMs }.average().toFloat(),
+            convertAvgMs = samples.map { it.convertMs }.average().toFloat(),
+            intervalAvgMs = intervalAvg,
+        )
+    }
+
+    /** Una línea por animación terminada, para comparar en los logs. */
+    private fun finishAnimationSummary() {
+        if (animationFrames < 2) return
+        val durationMs = (lastFrameStartedMs - animationStartedMs).coerceAtLeast(1L)
+        val stats = mutableState.value.stats
+        fun f(value: Float) = "%.1f".format(java.util.Locale.US, value)
+        TelemetryLog.event(
+            "VEHICLE_3D_OFFSCREEN",
+            "animation frames=$animationFrames durationMs=$durationMs " +
+                "fps=${f((animationFrames - 1) * 1000f / durationMs)} " +
+                "renderAvgMs=${animationRenderMs / animationFrames} windowP95Ms=${f(stats.renderP95Ms)} " +
+                "drawMs=${f(stats.drawAvgMs)} readbackMs=${f(stats.readbackAvgMs)} convertMs=${f(stats.convertAvgMs)}",
+        )
+        animationFrames = 0
+        lastFrameStartedMs = 0L
+    }
+
     /** Runs on the render thread. */
     private fun scheduleLoop() {
         if (loopScheduled || renderer == null) return
@@ -130,14 +221,16 @@ internal object Vehicle3dOffscreenEngine {
             try {
                 val started = SystemClock.elapsedRealtimeNanos()
                 val bitmap = activeRenderer.render(current, animator, vehicle3dLitNodes(current, now))
-                val elapsedMs = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000L
+                val elapsedNs = SystemClock.elapsedRealtimeNanos() - started
                 frameNumber++
                 renderedInput = current
+                val stats = recordFrame(now, elapsedNs, activeRenderer)
                 mutableState.value = Vehicle3dOffscreenState(
                     bitmap = bitmap,
                     status = if (animating) "rendering" else "idle",
                     frame = frameNumber,
-                    renderMs = elapsedMs,
+                    renderMs = elapsedNs / 1_000_000L,
+                    stats = stats,
                 )
             } catch (error: Throwable) {
                 loopScheduled = false
@@ -146,9 +239,13 @@ internal object Vehicle3dOffscreenEngine {
             }
         }
         if (animating) {
-            handler?.postDelayed(::tick, FRAME_INTERVAL_MS)
+            // Cadencia fija: el intervalo se cuenta desde el inicio de este fotograma, no desde que
+            // termina el render; si el render lo supera, el siguiente se encadena sin espera.
+            val delay = (FRAME_INTERVAL_MS - (SystemClock.uptimeMillis() - now)).coerceAtLeast(0L)
+            handler?.postDelayed(::tick, delay)
         } else {
             loopScheduled = false
+            finishAnimationSummary()
         }
     }
 

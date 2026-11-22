@@ -21,7 +21,65 @@ internal fun StringBuilder.appendRightPanelTaskOwnershipSection(context: Context
     if (processDiagnostics.isEmpty()) appendLine("--") else processDiagnostics.forEach(::appendLine)
     appendLine("Waze windowing support:")
     wazeWindowingDiagnostics(context).forEach(::appendLine)
+    appendQfWindowPolicySection(context)
 }
+
+// ROM QF005: services.jar pasa a fullscreen las tareas freeform abiertas por un paquete distinto de
+// persist.sys.qf.launcher y fuerza sys.qf.freeform.bound como límites de toda ventana freeform.
+private val QF_WINDOW_PROPERTIES = listOf(
+    "persist.sys.qf.launcher",
+    "sys.qf.freeform.bound",
+    "sys.freeform.fullscreen",
+    "sys.qf.freeform.hide",
+    "sys.qf.top_pkg_name",
+    "sys.qf.last_exec_pkg_name",
+    "sys.qf.current.activity",
+    "persist.sys.new_set_launcher",
+)
+
+private val QF_WINDOW_CONFIG_FILES = listOf(
+    "/system/config/AppNotSupportSplit.config",
+    "/system/config/SplitApp.ini",
+    "/system/config/RestoreAppsWhenWakeup.ini",
+)
+
+private fun StringBuilder.appendQfWindowPolicySection(context: Context) {
+    section("QF WINDOW POLICY")
+    val values = QF_WINDOW_PROPERTIES.associateWith(::readSystemProperty)
+    values.forEach { (key, value) -> field(key, value ?: "--") }
+    val registered = values["persist.sys.qf.launcher"].orEmpty()
+    field(
+        "QF registered launcher matches this app",
+        when {
+            registered.isEmpty() -> "unknown"
+            context.packageName.startsWith(registered) -> "yes"
+            else -> "no (${context.packageName}); panel relaunches are reset to fullscreen by the ROM"
+        },
+    )
+    QF_WINDOW_CONFIG_FILES.forEach { path ->
+        appendLine("$path:")
+        val content = runCatching { java.io.File(path).readText().trim() }
+            .getOrElse { "unreadable: ${it.javaClass.simpleName}" }
+        appendLine(content.ifEmpty { "(empty)" }.lines().take(MAX_CONFIG_LINES).joinToString("\n"))
+    }
+}
+
+private fun readSystemProperty(key: String): String? {
+    val viaReflection = runCatching {
+        Class.forName("android.os.SystemProperties")
+            .getMethod("get", String::class.java)
+            .invoke(null, key) as String
+    }.getOrNull()
+    if (viaReflection != null) return viaReflection.ifEmpty { "(empty)" }
+    return runCatching {
+        val process = ProcessBuilder("getprop", key).redirectErrorStream(true).start()
+        process.inputStream.bufferedReader().use { it.readText().trim() }
+            .also { process.waitFor() }
+            .ifEmpty { "(empty)" }
+    }.getOrNull()
+}
+
+private const val MAX_CONFIG_LINES = 80
 
 internal fun StringBuilder.appendBluetoothPhoneAudioSection() {
     section("BLUETOOTH PHONE / AUDIO")
@@ -41,6 +99,14 @@ internal fun StringBuilder.appendOffscreenOpengl3dSection(context: Context, stat
     field("Status", offscreen3d.status)
     field("Frame", offscreen3d.frame)
     field("Render time", offscreen3d.renderMs?.let { "$it ms" } ?: "--")
+    val stats = offscreen3d.stats
+    fun f(value: Float) = "%.1f".format(java.util.Locale.US, value)
+    field("Target interval", "50 ms (20 fps), fixed cadence")
+    field("Last minute frames", stats.frames)
+    field("Last minute fps", f(stats.fps))
+    field("Frame interval avg", "${f(stats.intervalAvgMs)} ms")
+    field("Render avg / p95 / max", "${f(stats.renderAvgMs)} / ${f(stats.renderP95Ms)} / ${f(stats.renderMaxMs)} ms")
+    field("Draw / readback / convert avg", "${f(stats.drawAvgMs)} / ${f(stats.readbackAvgMs)} / ${f(stats.convertAvgMs)} ms")
     field("Error", offscreen3d.error ?: "--")
     appendLine("Mode: read-only")
     appendLine("Capture: ${if (state.captureActive) "active" else "stopped"}")

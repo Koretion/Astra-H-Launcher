@@ -338,7 +338,16 @@ internal class OffscreenGlesRenderer(
         return FloatArray(3) { a[it + 1] + (b[it + 1] - a[it + 1]) * f }
     }
 
+    /** Duración de las fases del último fotograma, en nanosegundos. */
+    var lastDrawNs = 0L
+        private set
+    var lastReadbackNs = 0L
+        private set
+    var lastConvertNs = 0L
+        private set
+
     fun render(input: Vehicle3dSceneInput, animator: Vehicle3dSceneAnimator, litLights: Set<String>): Bitmap {
+        val drawStarted = System.nanoTime()
         check(EGL14.eglMakeCurrent(display, surface, surface, context)) { "eglMakeCurrent render" }
         // Parado se dibuja solo la parte inferior (el hueco visible del carrusel); al conducir la
         // altura crece con la transición a carretera para que el encuadre no salte.
@@ -404,13 +413,18 @@ internal class OffscreenGlesRenderer(
         if (!input.topView && input.brake) drawThirdBrakeHalo(viewProj, eye, input.dark)
 
         GLES20.glFinish()
+        val drawFinished = System.nanoTime()
         pixels.clear()
         GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixels)
+        val readFinished = System.nanoTime()
         rgbaBottomUpToArgb(pixels.array(), argb, width, height)
         // Three bitmaps rotate so Compose never draws the one being written.
         val bitmap = bitmaps[nextBitmap]
         nextBitmap = (nextBitmap + 1) % bitmaps.size
         bitmap.setPixels(argb, 0, width, 0, 0, width, height)
+        lastDrawNs = drawFinished - drawStarted
+        lastReadbackNs = readFinished - drawFinished
+        lastConvertNs = System.nanoTime() - readFinished
         return bitmap
     }
 
