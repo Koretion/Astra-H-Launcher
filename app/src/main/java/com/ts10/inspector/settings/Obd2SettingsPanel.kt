@@ -6,7 +6,6 @@ import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -22,33 +21,25 @@ import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.BluetoothDisabled
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ts10.inspector.R
 import com.ts10.inspector.ui.DashboardAssetIcon
 import com.ts10.inspector.ui.LauncherLayout
 import com.ts10.inspector.ui.LocalDashboardColors
-import com.ts10.inspector.vehicle.formatManualOdometerKm
 import com.ts10.inspector.vehicle.obd.Obd2Client
 import com.ts10.inspector.vehicle.obd.ObdConnectionState
-import com.ts10.inspector.vehicle.parseManualOdometerKm
 
 @Composable
 internal fun Obd2SettingsPanel(
@@ -59,13 +50,6 @@ internal fun Obd2SettingsPanel(
     val context = LocalContext.current
     val colors = LocalDashboardColors.current
     val state by Obd2Client.state.collectAsStateWithLifecycle()
-    val dashboardPreferences = remember(context) { DashboardPreferences.get(context) }
-    val dashboardSettings by dashboardPreferences.state.collectAsStateWithLifecycle()
-    var odometerInput by remember(dashboardSettings.manualOdometerKm) {
-        mutableStateOf(formatManualOdometerKm(dashboardSettings.manualOdometerKm))
-    }
-    var odometerMessage by remember { mutableStateOf<String?>(null) }
-    var odometerError by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.connection) {
         if (state.connection == ObdConnectionState.CONNECTED) Obd2Client.ensureTroubleCodesRead()
@@ -105,61 +89,6 @@ internal fun Obd2SettingsPanel(
                     fontSize = layout.sp(10),
                     modifier = Modifier.padding(vertical = layout.dp(8)),
                 )
-            }
-        }
-        item {
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = layout.dp(5))) {
-                OutlinedTextField(
-                    value = odometerInput,
-                    onValueChange = { value ->
-                        odometerInput = value
-                            .filter { it.isDigit() || it == ',' || it == '.' }
-                            .take(MAX_ODOMETER_INPUT_LENGTH)
-                        odometerMessage = null
-                        odometerError = false
-                    },
-                    label = { Text(stringResource(R.string.obd_odometer_label), fontSize = layout.sp(9)) },
-                    placeholder = { Text(stringResource(R.string.obd_odometer_example), fontSize = layout.sp(9)) },
-                    supportingText = {
-                        Text(
-                            odometerMessage ?: stringResource(R.string.obd_odometer_hint),
-                            fontSize = layout.sp(8),
-                        )
-                    },
-                    isError = odometerError,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = layout.sp(10)),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(
-                    onClick = {
-                        val parsed = parseManualOdometerKm(odometerInput)
-                        if (odometerInput.isBlank()) {
-                            dashboardPreferences.setManualOdometerKm(null)
-                            odometerError = false
-                            odometerMessage = context.getString(R.string.obd_odometer_cleared)
-                        } else if (parsed == null) {
-                            odometerError = true
-                            odometerMessage = context.getString(R.string.obd_odometer_invalid)
-                        } else {
-                            dashboardPreferences.setManualOdometerKm(parsed)
-                            odometerInput = formatManualOdometerKm(parsed)
-                            odometerError = false
-                            odometerMessage = context.getString(R.string.obd_odometer_saved, formatManualOdometerKm(parsed))
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.primary.copy(alpha = if (colors.dark) .10f else .07f),
-                        contentColor = Color(0xFF2E9D50),
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        if (odometerInput.isBlank()) stringResource(R.string.obd_clear_reference) else stringResource(R.string.obd_save_reference),
-                        fontSize = layout.sp(9),
-                    )
-                }
             }
         }
         item {
@@ -396,4 +325,3 @@ private fun connectionColor(connection: ObdConnectionState, muted: Color): Color
     else -> muted
 }
 
-private const val MAX_ODOMETER_INPUT_LENGTH = 11

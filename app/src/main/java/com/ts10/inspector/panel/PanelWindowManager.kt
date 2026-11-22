@@ -479,6 +479,14 @@ internal object PanelBoundsStabilizer {
                     SystemClock.elapsedRealtime(),
                 )) return
             val taskId = snapshot?.taskId
+            // Redimensionar no saca una tarea de la pila fullscreen; hay que recrearla.
+            if (
+                shouldReplaceFullscreenWazeTask(packageName, snapshot?.windowingMode) &&
+                WazeTaskResetActivity.start(context, taskId, activityClassName, forceBoundsRepair = true)
+            ) {
+                finish("$packageName reconciliacion=recreandoTarea motivo=$reason")
+                return
+            }
             adaptCommandBounds(snapshot)
             val route = applyExactOrFallback(taskId, commandBounds)
             recordAdjustment(reason, taskId, commandBounds, route)

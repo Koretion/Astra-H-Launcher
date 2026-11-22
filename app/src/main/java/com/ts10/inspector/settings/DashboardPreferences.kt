@@ -22,7 +22,6 @@ data class DashboardSettings(
     val mediaPackages: List<String> = emptyList(),
     val favoritePackages: List<String> = emptyList(),
     val panelPackages: List<String> = emptyList(),
-    val manualOdometerKm: Double? = null,
     val onlineWeatherEnabled: Boolean = true,
     val language: AppLanguage = AppLanguage.AUTO,
     val fusedLocationEnabled: Boolean = false,
@@ -190,16 +189,6 @@ class DashboardPreferences private constructor(private val context: Context) {
         preferences.edit().putBoolean(KEY_FUSED_LOCATION, enabled).apply()
     }
 
-    fun setManualOdometerKm(value: Double?) {
-        val editor = preferences.edit()
-        if (value != null && value.isFinite() && value in 0.0..MAX_ODOMETER_KM) {
-            editor.putString(KEY_MANUAL_ODOMETER_KM, value.toString())
-        } else {
-            editor.remove(KEY_MANUAL_ODOMETER_KM)
-        }
-        editor.apply()
-    }
-
     fun setQfDoorPopupEnabled(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_QF_DOOR_POPUP, enabled).apply()
     }
@@ -271,7 +260,6 @@ class DashboardPreferences private constructor(private val context: Context) {
         private const val KEY_MEDIA_PACKAGES = "media_packages"
         private const val KEY_FAVORITES = "favorite_packages"
         private const val KEY_PANEL_PACKAGES = "panel_packages"
-        private const val KEY_MANUAL_ODOMETER_KM = "manual_odometer_km"
         private const val KEY_ONLINE_WEATHER = "online_weather"
         private const val KEY_FUSED_LOCATION = "fused_location_enabled"
         private const val KEY_QF_DOOR_POPUP = "qf_door_popup_enabled"
@@ -289,7 +277,6 @@ class DashboardPreferences private constructor(private val context: Context) {
         private const val KEY_LOCAL_VISION_CAPTURE_MODE = "local_vision_capture_mode"
         private const val KEY_LOCAL_VISION_OBJECTS = "local_vision_objects_enabled"
         private const val SEPARATOR = "|"
-        internal const val MAX_ODOMETER_KM = 9_999_999.999
 
         @Volatile
         private var instance: DashboardPreferences? = null
@@ -328,9 +315,6 @@ class DashboardPreferences private constructor(private val context: Context) {
                 .split(SEPARATOR)
                 .filter(String::isNotBlank)
                 .distinct(),
-            manualOdometerKm = preferences.getString(KEY_MANUAL_ODOMETER_KM, null)
-                ?.toDoubleOrNull()
-                ?.takeIf { it.isFinite() && it in 0.0..MAX_ODOMETER_KM },
             onlineWeatherEnabled = preferences.getBoolean(KEY_ONLINE_WEATHER, true),
             language = runCatching {
                 AppLanguage.valueOf(preferences.getString(KEY_LANGUAGE, null) ?: AppLanguage.AUTO.name)

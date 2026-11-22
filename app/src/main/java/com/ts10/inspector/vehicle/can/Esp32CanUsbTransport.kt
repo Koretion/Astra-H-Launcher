@@ -235,6 +235,14 @@ internal object Esp32CanUsbTransport {
         connection = null
     }
 
+    fun reconnectAfterFirmwareRestart() {
+        mainHandler.post {
+            if (romExclusive.get()) return@post
+            if (connection != null) close()
+            scheduleScan(UiText.of(R.string.efw_restarting), FIRMWARE_RESTART_RECONNECT_MS)
+        }
+    }
+
     fun sendUpdaterRecord(type: Int, payload: ByteArray): Boolean {
         if (romExclusive.get()) return false
         val packet = runCatching { encodeEsp32UsbRecord(type, payload) }.getOrNull() ?: return false
@@ -458,6 +466,7 @@ internal object Esp32CanUsbTransport {
     private const val ROM_PORT_OPEN_TIMEOUT_MS = 8_000L
     private const val ROM_REENUMERATION_TIMEOUT_MS = 12_000L
     private const val ROM_RECONNECT_DELAY_MS = 1_500L
+    private const val FIRMWARE_RESTART_RECONNECT_MS = 3_000L
     private const val ROM_WRITE_TIMEOUT_MS = 5_000
     private const val ROM_DRAIN_TIMEOUT_MS = 30
     private const val ROM_PERMISSION_REQUEST_CODE = 32

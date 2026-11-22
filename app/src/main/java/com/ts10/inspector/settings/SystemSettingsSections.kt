@@ -40,6 +40,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.ts10.inspector.AppVersion
 import com.ts10.inspector.dashboard.VehicleSceneMode
 import com.ts10.inspector.diagnostics.AndroidRootChecker
+import com.ts10.inspector.diagnostics.FrameworkExportActivity
 import com.ts10.inspector.diagnostics.QfLogExportActivity
 import com.ts10.inspector.environment.OsmRoadContextProvider
 import com.ts10.inspector.launcher.HybridOverlayService
@@ -536,6 +537,7 @@ internal fun DiagnosticsDetail(layout: LauncherLayout, width: Float, height: Flo
     val context = LocalContext.current
     val state by LauncherRuntime.diagnostics.collectAsStateWithLifecycle()
     val esp32 by Esp32CanClient.state.collectAsStateWithLifecycle()
+    val frameworkExport by FrameworkExportActivity.progress.collectAsStateWithLifecycle()
     val recentLog = state.log.takeLast(120).asReversed()
     LazyColumn(modifier = Modifier.size(layout.dp(width), layout.dp(height))) {
         item {
@@ -551,6 +553,12 @@ internal fun DiagnosticsDetail(layout: LauncherLayout, width: Float, height: Flo
                 )
                 DiagnosticAction(stringResource(R.string.diag_save), Color(0xFF3579B8), layout) { QfLogExportActivity.launch(context) }
                 DiagnosticAction(stringResource(R.string.diag_clear), Color(0xFF3579B8), layout, LauncherRuntime::clearDiagnosticsLog)
+                DiagnosticAction(
+                    if (frameworkExport.running) stringResource(R.string.diag_framework_percent, frameworkExport.percent)
+                    else stringResource(R.string.diag_framework),
+                    if (frameworkExport.running) Color(0xFFE0A020) else Color(0xFF3579B8),
+                    layout,
+                ) { FrameworkExportActivity.launch(context) }
             }
         }
         item { SettingsCard(layout, width) {
@@ -558,6 +566,24 @@ internal fun DiagnosticsDetail(layout: LauncherLayout, width: Float, height: Flo
             MetricRow(stringResource(R.string.diag_binder), state.binderStatus.text(), "VehicleService", layout)
             MetricRow(stringResource(R.string.diag_packets), state.packetCount.toString(), state.lastSource, layout)
             MetricRow("GMLAN-USB", esp32.status.text(), stringResource(R.string.diag_frames_rate, esp32.frames.toInt(), esp32.framesPerSecond), layout)
+            if (frameworkExport.running || frameworkExport.completed || frameworkExport.failed) {
+                MetricRow(
+                    stringResource(R.string.framework_export_title),
+                    when {
+                        frameworkExport.running -> stringResource(
+                            R.string.framework_export_progress,
+                            frameworkExport.percent,
+                            frameworkExport.copiedMb,
+                            frameworkExport.totalMb,
+                        )
+                        frameworkExport.completed -> stringResource(R.string.framework_export_complete)
+                        else -> stringResource(R.string.framework_export_incomplete)
+                    },
+                    if (frameworkExport.running) stringResource(R.string.framework_export_keep_usb)
+                    else stringResource(R.string.framework_export_files, frameworkExport.files, frameworkExport.copiedMb),
+                    layout,
+                )
+            }
             MetricRow(stringResource(R.string.diag_last_frame), esp32.lastFrame, "USB", layout)
         } }
         item {

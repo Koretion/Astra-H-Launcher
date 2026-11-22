@@ -35,6 +35,7 @@ internal fun launchApplicationInContentArea(
     activityClassName: String? = null,
     forceBoundsRepair: Boolean = false,
     supersedePendingLaunches: Boolean = true,
+    allowWazeTaskReset: Boolean = true,
 ): Boolean {
     if (supersedePendingLaunches) LauncherStartupCoordinator.userTookControl()
     TelemetryLog.event(
@@ -59,6 +60,18 @@ internal fun launchApplicationInContentArea(
         !PanelApplicationSession.hasLaunchMigration(context, WAZE_RECONCILER_MIGRATION)
     if (forceBoundsRepair || resetLegacyWazeLaunch) {
         clearQfLaunchParams(packageName)
+    }
+    if (
+        replaceFullscreenWazeTask &&
+        allowWazeTaskReset &&
+        WazeTaskResetActivity.start(context, existingTaskId, activityClassName, forceBoundsRepair = true)
+    ) {
+        PanelApplicationSession.remember(context, packageName, activityClassName)
+        TelemetryLog.event(
+            "EXTERNAL_APP",
+            "removing fullscreen Waze task=${existingTaskId ?: "unknown"} before freeform launch",
+        )
+        return true
     }
     val intent = activityClassName?.let { className ->
         Intent(Intent.ACTION_MAIN)

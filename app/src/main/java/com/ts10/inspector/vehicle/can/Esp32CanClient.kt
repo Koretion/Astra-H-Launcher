@@ -7,7 +7,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import com.ts10.inspector.diagnostics.TelemetryLog
-import com.ts10.inspector.settings.DashboardPreferences
 import com.ts10.inspector.vehicle.SteeringAngleMemory
 import com.ts10.inspector.vehicle.VehicleMileageTracker
 import com.ts10.inspector.vehicle.fuel.FuelRangeEstimator
@@ -211,9 +210,6 @@ internal object Esp32CanClient {
             localLogDrops = 0,
             capturePath = path,
         )
-        context?.let { DashboardPreferences.current(it) }?.manualOdometerKm?.let { odometer ->
-            captureLog.event("Referencia manual cuentakilometros=${"%.3f".format(Locale.US, odometer)} km")
-        }
     }
 
     fun stopCapture() {

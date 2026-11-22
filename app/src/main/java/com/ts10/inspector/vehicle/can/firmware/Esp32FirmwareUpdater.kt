@@ -40,6 +40,8 @@ internal object Esp32FirmwareUpdater {
     private val worker = Executors.newSingleThreadExecutor()
     private val replies = LinkedBlockingQueue<Reply>()
     @Volatile private var selectedUri: Uri? = null
+    // Version to confirm with OP_INFO once the board has restarted with the new image.
+    @Volatile private var pendingVersionCheck: String? = null
 
     fun onUsbConnected() {
         mutableState.value = mutableState.value.copy(usbConnected = true, status = UiText.of(R.string.efw_checking_firmware))
@@ -122,11 +124,15 @@ internal object Esp32FirmwareUpdater {
                     }
                     null -> fail(R.string.efw_not_identified)
                 }
+                pendingVersionCheck = expectedVersion
                 mutableState.value = mutableState.value.copy(
                     busy = false,
                     progressPercent = 100,
                     status = UiText.of(R.string.efw_verified),
                 )
+                // The ESP32-C3 native USB stays enumerated across a software restart, so Android
+                // sees no detach: reopen it to read the version that is actually running.
+                Esp32CanUsbTransport.reconnectAfterFirmwareRestart()
             }.onFailure { error ->
                 mutableState.value = mutableState.value.copy(
                     busy = false,
@@ -175,10 +181,18 @@ internal object Esp32FirmwareUpdater {
         if (mutableState.value.busy) return
         replies.clear()
         val available = runCatching { sendAndAwait(OP_INFO, byteArrayOf(PROTOCOL_VERSION.toByte()), 2) }.getOrNull()
+        val installed = available?.message?.toByteArray(Charsets.US_ASCII)?.let(::extractGmlanFirmwareVersion)
+        val expected = pendingVersionCheck
+        pendingVersionCheck = null
         mutableState.value = mutableState.value.copy(
             otaSupported = available?.ok == true && available.protocol >= PROTOCOL_VERSION,
-            installedVersion = available?.message?.toByteArray(Charsets.US_ASCII)?.let(::extractGmlanFirmwareVersion),
-            status = if (available?.ok == true) UiText.of(R.string.efw_ota_available) else UiText.of(R.string.efw_needs_usb_activation),
+            installedVersion = installed,
+            status = when {
+                expected != null && installed == expected -> UiText.of(R.string.efw_running_version, expected)
+                expected != null -> UiText.of(R.string.efw_restart_needed, expected)
+                available?.ok == true -> UiText.of(R.string.efw_ota_available)
+                else -> UiText.of(R.string.efw_needs_usb_activation)
+            },
         )
     }
 

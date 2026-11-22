@@ -21,13 +21,8 @@ import com.ts10.inspector.vehicle.tires.TirePosition
 import java.util.Locale
 
 internal fun StringBuilder.appendEsp32CanRawUsbSection(context: Context) {
-    val dashboardSettings = DashboardPreferences.current(context)
     val esp32Can = Esp32CanClient.state.value
     section("ESP32 CAN RAW / USB")
-    field(
-        "Manual odometer reference",
-        dashboardSettings.manualOdometerKm?.let { "%.3f km".format(Locale.US, it) } ?: "--",
-    )
     field("Status", esp32Can.status.english(context))
     field("Device", esp32Can.deviceName ?: "--")
     field("Address", esp32Can.deviceAddress ?: "--")

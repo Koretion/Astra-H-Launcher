@@ -4,6 +4,7 @@ import android.content.Context
 import com.ts10.inspector.panel.panelAutomaticRestoreBlockReason
 import com.ts10.inspector.panel.panelProcessDiagnostics
 import com.ts10.inspector.panel.panelTaskDiagnostics
+import com.ts10.inspector.panel.wazeWindowingDiagnostics
 import com.ts10.inspector.phone.AndroidBluetoothPhoneClient
 import com.ts10.inspector.settings.DashboardPreferences
 import com.ts10.inspector.vehicle.qf.QfDiagnosticsState
@@ -18,6 +19,8 @@ internal fun StringBuilder.appendRightPanelTaskOwnershipSection(context: Context
     appendLine("Configured application processes:")
     val processDiagnostics = panelProcessDiagnostics(context)
     if (processDiagnostics.isEmpty()) appendLine("--") else processDiagnostics.forEach(::appendLine)
+    appendLine("Waze windowing support:")
+    wazeWindowingDiagnostics(context).forEach(::appendLine)
 }
 
 internal fun StringBuilder.appendBluetoothPhoneAudioSection() {
