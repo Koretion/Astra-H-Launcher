@@ -92,14 +92,15 @@ each one can provide.
 | Android 10+ head unit | Yes | Launcher base. Tested on a TS10 with QF firmware |
 | QF information (TS10 CAN box) | No | Climate and doors from the CAN box, and FM radio, on TS10 units |
 | ELM327 Bluetooth OBD2 adapter | No | RPM, speed, temperature, air flow and estimated consumption, on any OBD2 car |
-| GMLAN-USB sniffer (ESP32-C3) | Recommended | Passive HS-CAN, MS-CAN and SW-CAN reading on the Astra H: odometer, fuel, lights, locking, keys, tyres… |
+| [GMLAN-USB](https://github.com/Koretion/GMLAN-USB) sniffer (ESP32-C3) | Recommended | Passive HS-CAN, MS-CAN and SW-CAN reading on the Astra H: odometer, fuel, lights, locking, keys, tyres… |
 | Compatible USB camera or dashcam | No | Image for the camera and the visual aid |
 | USB TPMS receiver | No | Tyre pressure |
 
 > [!NOTE]
-> **GMLAN-USB** is a separate project of our own, also in active development and still being
-> tested. It is **listen-only**: it never transmits to the car. Once it has been validated, a link
-> to the project will be added here, with its schematics, documentation and firmware.
+> **[GMLAN-USB](https://github.com/Koretion/GMLAN-USB)** is a separate open hardware project of our own that complements the
+> launcher: schematics, PCB, manufacturing files and enclosure are published there. It is a
+> prototype still being validated. Used with the launcher it is **listen-only**: it never transmits
+> to the car. Each project works without the other; together they give the most complete data.
 
 > [!NOTE]
 > More OBD2 data and recognised CAN frames will be added as the research continues.

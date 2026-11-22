@@ -92,14 +92,15 @@ cada una puede aportar.
 | Radio con Android 10 o superior | Sí | Base del launcher. Probado en una TS10 con firmware QF |
 | Información QF (CAN box de la TS10) | No | Clima y puertas desde la CAN box, y radio FM, en radios TS10 |
 | Adaptador OBD2 ELM327 Bluetooth | No | RPM, velocidad, temperatura, caudal de aire y consumo estimado, en cualquier coche con OBD2 |
-| Capturador GMLAN-USB (ESP32-C3) | Recomendado | Lectura pasiva de HS-CAN, MS-CAN y SW-CAN en el Astra H: odómetro, combustible, luces, cierre, llaves, neumáticos… |
+| Capturador [GMLAN-USB](https://github.com/Koretion/GMLAN-USB) (ESP32-C3) | Recomendado | Lectura pasiva de HS-CAN, MS-CAN y SW-CAN en el Astra H: odómetro, combustible, luces, cierre, llaves, neumáticos… |
 | Cámara USB o dashcam compatible | No | Imagen para la cámara y la ayuda visual |
 | Receptor TPMS USB | No | Presión de neumáticos |
 
 > [!NOTE]
-> El **GMLAN-USB** es un proyecto propio independiente, también en desarrollo y todavía en fase de
-> pruebas. Funciona **solo en escucha**: no transmite nada al coche. Cuando esté probado se
-> añadirá aquí el enlace al proyecto, con sus planos, documentación y firmware.
+> El **[GMLAN-USB](https://github.com/Koretion/GMLAN-USB)** es un proyecto propio de hardware abierto que complementa al launcher:
+> allí se publican el esquema, la PCB, los archivos de fabricación y la caja. Es un prototipo
+> todavía en validación. Con el launcher funciona **solo en escucha**: no transmite nada al coche.
+> Cada proyecto funciona sin el otro; juntos ofrecen los datos más completos.
 
 > [!NOTE]
 > Se irán añadiendo más datos OBD2 y tramas CAN reconocidas conforme avance la investigación.
