@@ -8,6 +8,7 @@
 [![Tested on](https://img.shields.io/badge/tested%20on-TS10%20%C2%B7%20Opel%20Astra%20H-informational.svg)](#hardware)
 [![Status](https://img.shields.io/badge/status-active%20development-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20the%20project-FF5E5B.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/koretion)
 
 An Android home-screen launcher for car head units. It replaces the home screen with a fixed
 panel showing vehicle data, climate, media and phone, and leaves the rest of the screen to a
@@ -147,6 +148,13 @@ docs/       CAN signal table, README screenshots and the Google Sheets trip-trac
 - The visual aid is not a certified ADAS and does not act on the vehicle.
 - Integrations with the QF firmware are specific to TS10 head units and may vary between firmware
   versions.
+
+## Support the project
+
+Astra H Launcher is free and developed in my spare time. If it is useful to you and you would like
+to help it keep growing, you can buy me a coffee on Ko-fi:
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/koretion)
 
 ## License
 

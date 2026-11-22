@@ -8,6 +8,7 @@
 [![Tested on](https://img.shields.io/badge/tested%20on-TS10%20%C2%B7%20Opel%20Astra%20H-informational.svg)](#hardware)
 [![Status](https://img.shields.io/badge/status-active%20development-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20the%20project-FF5E5B.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/koretion)
 
 Launcher Android para radios de coche. Sustituye la pantalla de inicio por un panel fijo con los
 datos del vehículo, el clima, la multimedia y el teléfono, y deja el resto de la pantalla a una
@@ -147,6 +148,13 @@ docs/       Tabla de señales CAN, capturas del README y el script de Google She
 - La ayuda visual no es un ADAS certificado y no actúa sobre el vehículo.
 - Las integraciones con el firmware QF son específicas de las radios TS10 y pueden variar entre
   versiones de firmware.
+
+## Apoya el proyecto
+
+Astra H Launcher es gratuito y lo desarrollo en mi tiempo libre. Si te resulta útil y quieres
+ayudar a que siga creciendo, puedes invitarme a un café en Ko-fi:
+
+[![Apóyame en Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/koretion)
 
 ## Licencia
 
