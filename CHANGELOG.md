@@ -5,6 +5,24 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.6 — 2026-11-22
+
+Versión Android: `versionCode 67`, `versionName 0.5.6`.
+
+- Waze vuelve a su hueco del panel derecho cuando queda a pantalla completa. Sin root no se puede
+  cambiar el modo de una tarea ajena, así que el launcher cierra esa tarea de Waze y la abre de
+  nuevo en ventana libre, como al cerrarlo y abrirlo a mano. Lo hace al abrir Waze y cuando la ROM
+  lo pasa a pantalla completa después, como máximo una vez por minuto. El informe QF indica si las
+  actividades de Waze son redimensionables.
+- Se retira la referencia manual del cuentakilómetros de Ajustes › OBD: el kilometraje se lee de
+  la trama HS-CAN.
+- Nuevo botón FRAMEWORK en Diagnóstico: copia en un ZIP, en el USB u otra ubicación elegida, el
+  framework y las aplicaciones del sistema legibles sin root, para analizar la ROM en el PC. El
+  botón muestra el porcentaje, Diagnóstico indica los MB copiados del total y una notificación
+  lleva la barra de progreso; al acabar se indica si el ZIP está completo.
+- Tras actualizar el GMLAN-USB por OTA, el launcher reabre el USB y comprueba la versión que está
+  en marcha. Antes seguía mostrando la versión anterior hasta apagar la radio.
+
 ## 0.5.4 — 2026-11-21
 
 Versión Android: `versionCode 65`, `versionName 0.5.4`.

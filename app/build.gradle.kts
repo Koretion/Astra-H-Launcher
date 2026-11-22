@@ -4,8 +4,8 @@ plugins {
 }
 
 // Unico punto que se modifica al preparar una nueva entrega.
-val astraVersionCode = 65
-val astraVersionName = "0.5.4"
+val astraVersionCode = 67
+val astraVersionName = "0.5.6"
 
 // Repositorio de GitHub del que se descargan las actualizaciones del launcher.
 val updateRepository = providers.gradleProperty("updateRepository").orNull ?: "Koretion/Astra-H-Launcher"
