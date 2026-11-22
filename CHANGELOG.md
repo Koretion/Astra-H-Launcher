@@ -5,6 +5,20 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.7 — 2026-11-22
+
+Versión Android: `versionCode 68`, `versionName 0.5.7`.
+
+- El coche 3D anima con cadencia fija: el siguiente fotograma se cuenta desde el inicio del
+  anterior y no desde que termina el render, así que gana fluidez cuando el render es lento.
+- El informe QF mide el coche 3D en el último minuto: fotogramas, FPS reales, render medio, p95 y
+  máximo, y el reparto entre dibujo, copia desde la GPU y conversión a bitmap. Cada animación
+  terminada deja una línea `VEHICLE_3D_OFFSCREEN animation` con sus FPS.
+- Nueva sección `QF WINDOW POLICY` en el informe: el launcher que la ROM tiene registrado
+  (`persist.sys.qf.launcher`) y si coincide con este, el rectángulo freeform forzado
+  (`sys.qf.freeform.bound`) y las listas de `/system/config` que deciden qué apps admiten ventana
+  y cuáles se restauran al despertar.
+
 ## 0.5.6 — 2026-11-22
 
 Versión Android: `versionCode 67`, `versionName 0.5.6`.

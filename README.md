@@ -24,7 +24,7 @@ and/or the GMLAN-USB sniffer (recommended).
 > CAN signals decoded by the GMLAN-USB are those of the Astra H. With another car, standard OBD2
 > data still works through the ELM327.
 
-Current version: **0.5.6** (`versionCode 67`). See [CHANGELOG.md](CHANGELOG.md).
+Current version: **0.5.7** (`versionCode 68`). See [CHANGELOG.md](CHANGELOG.md).
 
 ## Screenshots
 
