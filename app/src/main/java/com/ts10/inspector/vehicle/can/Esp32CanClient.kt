@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import com.ts10.inspector.diagnostics.TelemetryLog
+import com.ts10.inspector.vehicle.TurnSignalFlash
 import com.ts10.inspector.vehicle.SteeringAngleMemory
 import com.ts10.inspector.vehicle.VehicleMileageTracker
 import com.ts10.inspector.vehicle.fuel.FuelRangeEstimator
@@ -332,6 +333,12 @@ internal object Esp32CanClient {
         hsVehicleDecoder.accept(frame)
         swVehicleDecoder.accept(frame)
         val now = SystemClock.elapsedRealtime()
+        // The BCM sends its turn-lamp frame once per flash: it is the real lamps' edge.
+        if (frame.bus == Esp32CanBus.SW_CAN && profile.carries(frame, CanSignals.TURN_LAMPS) &&
+            swVehicleDecoder.signals.let { it.leftIndicator || it.rightIndicator }
+        ) {
+            TurnSignalFlash.onFlashFrame(frame.timestampUs, now)
+        }
         if (frame.bus == Esp32CanBus.HS_CAN && profile.carries(frame, CanSignals.VEHICLE_SPEED_KMH)) {
             hsVehicleDecoder.signals.vehicleSpeedKmh?.toInt()?.let(FuelRangeEstimator::updateCanSpeed)
         }

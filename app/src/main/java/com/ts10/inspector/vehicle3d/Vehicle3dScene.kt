@@ -47,6 +47,32 @@ internal data class Vehicle3dSceneInput(
     val roadOneway: Boolean = true,
     val roadCenterLine: RoadLineStyle = RoadLineStyle.SOLID,
     val roadLaneLines: List<RoadLineStyle> = emptyList(),
+    /** Confirmed camera detections placed on the road, nearest first. */
+    val roadObjects: List<Vehicle3dRoadObject> = emptyList(),
+)
+
+internal enum class Vehicle3dRoadObjectKind { CAR, LARGE_VEHICLE, TWO_WHEELER, PERSON }
+
+/** A tracked road user relative to the car: lanes to the side and metres ahead of the bumper. */
+internal data class Vehicle3dRoadObject(
+    val id: Long,
+    val kind: Vehicle3dRoadObjectKind,
+    /** Lane widths from the centre of the car's lane, positive to the right. */
+    val lateralLanes: Float,
+    /** Metres from the front bumper to the nearest face of the object. */
+    val aheadMeters: Float,
+    val egoLane: Boolean,
+)
+
+/** Road object as drawn: smoothed between detector updates and faded in and out. */
+internal data class Vehicle3dAnimatedRoadObject(
+    val id: Long,
+    val kind: Vehicle3dRoadObjectKind,
+    val lateralLanes: Float,
+    val aheadMeters: Float,
+    val egoLane: Boolean,
+    /** 0 invisible, 1 fully shown. */
+    val presence: Float,
 )
 
 /** Node names and motion limits of the V45 GLB, measured from its exported Blender actions. */
@@ -75,7 +101,6 @@ internal object Vehicle3dRig {
     /** Astra H: about 2.7 steering-wheel turns lock to lock for ±32° at the road wheels. */
     const val STEERING_RATIO = 15f
     const val MAX_ROAD_WHEEL_DEGREES = 32f
-    const val INDICATOR_PERIOD_MS = 680L
 
     const val LIGHT_POSITION = "LUZ_POSICION"
     const val LIGHT_DIPPED = "LUZ_CRUCE"
@@ -183,6 +208,7 @@ internal class Vehicle3dSceneAnimator {
     /** Distance driven, wrapped, so the dashed lane lines move with the car. */
     var travelMeters = 0f; private set
     var orbit = vehicle3dCameraTarget(Vehicle3dSceneInput()); private set
+    var roadObjects: List<Vehicle3dAnimatedRoadObject> = emptyList(); private set
     private var initialized = false
 
     /** Advances the animation; returns true while another frame is needed. */
@@ -238,7 +264,8 @@ internal class Vehicle3dSceneAnimator {
             hood != input.hoodOpen.toProgress() || tailgate != input.tailgateOpen.toProgress() ||
             windowLeft != input.windowLeftDown.toProgress() || windowRight != input.windowRightDown.toProgress() ||
             showroom != showroomTarget
-        return cameraMoving || partsMoving || abs(metresPerSecond) > 0.05f ||
+        val objectsMoving = stepRoadObjects(input.roadObjects, dt)
+        return cameraMoving || partsMoving || objectsMoving || abs(metresPerSecond) > 0.05f ||
             abs(wheelTarget - steeringWheelDegrees) > 0.5f || input.leftIndicator || input.rightIndicator
     }
 
@@ -257,6 +284,41 @@ internal class Vehicle3dSceneAnimator {
         Vehicle3dRig.SPIN_PIVOTS.forEach { put(it, Mat4.rotation(spin, 1f, 0f, 0f)) }
     }
 
+    /**
+     * The detector publishes every ~0.65 s: positions glide towards each update instead of jumping,
+     * new tracks fade in where they appear and lost ones fade out where they were last seen.
+     */
+    private fun stepRoadObjects(targets: List<Vehicle3dRoadObject>, dt: Float): Boolean {
+        val blend = min(1f, dt / OBJECT_SMOOTH_SECONDS)
+        val fade = dt / OBJECT_FADE_SECONDS
+        val previous = roadObjects.associateBy { it.id }
+        var moving = false
+        val next = ArrayList<Vehicle3dAnimatedRoadObject>(targets.size + previous.size)
+        targets.forEach { target ->
+            val current = previous[target.id]
+            val lateral = current?.let { it.lateralLanes + (target.lateralLanes - it.lateralLanes) * blend }
+                ?: target.lateralLanes
+            val ahead = current?.let { it.aheadMeters + (target.aheadMeters - it.aheadMeters) * blend }
+                ?: target.aheadMeters
+            val presence = approach(current?.presence ?: 0f, 1f, fade)
+            if (presence < 1f || abs(lateral - target.lateralLanes) > 0.01f || abs(ahead - target.aheadMeters) > 0.05f) {
+                moving = true
+            }
+            next += Vehicle3dAnimatedRoadObject(target.id, target.kind, lateral, ahead, target.egoLane, presence)
+        }
+        val alive = targets.mapTo(HashSet()) { it.id }
+        roadObjects.forEach { gone ->
+            if (gone.id in alive) return@forEach
+            val presence = approach(gone.presence, 0f, fade)
+            if (presence > 0f) {
+                moving = true
+                next += gone.copy(presence = presence)
+            }
+        }
+        roadObjects = next
+        return moving
+    }
+
     private fun Boolean.toProgress() = if (this) 1f else 0f
 
     private companion object {
@@ -264,6 +326,8 @@ internal class Vehicle3dSceneAnimator {
         const val WINDOW_SECONDS = 3.5f
         const val CAMERA_SECONDS = 1.1f
         const val STEERING_RESPONSE = 8f
+        const val OBJECT_SMOOTH_SECONDS = 0.35f
+        const val OBJECT_FADE_SECONDS = 0.4f
         const val TWO_PI = (2 * PI).toFloat()
         /** Multiple of the 9 m dash period, so wrapping never makes the dashes jump. */
         const val TRAVEL_WRAP_METERS = 900f
@@ -281,8 +345,8 @@ internal class Vehicle3dSceneAnimator {
         }
     }
 }
-/** Which light nodes are lit (scale 1). Indicators blink with the measured Astra H period. */
-internal fun vehicle3dLitNodes(input: Vehicle3dSceneInput, uptimeMs: Long): Set<String> = buildSet {
+/** Which light nodes are lit (scale 1). [indicatorLampOn] is the phase locked to the real flasher. */
+internal fun vehicle3dLitNodes(input: Vehicle3dSceneInput, indicatorLampOn: Boolean): Set<String> = buildSet {
     val anyHeadlight = input.positionLights || input.dippedBeam || input.highBeam
     if (anyHeadlight) add(Vehicle3dRig.LIGHT_POSITION)
     if (input.dippedBeam || input.highBeam) add(Vehicle3dRig.LIGHT_DIPPED)
@@ -294,9 +358,8 @@ internal fun vehicle3dLitNodes(input: Vehicle3dSceneInput, uptimeMs: Long): Set<
     if (input.reverse) add(Vehicle3dRig.LIGHT_REVERSE)
     if (input.frontFog) add(Vehicle3dRig.LIGHT_FRONT_FOG)
     if (input.rearFog) add(Vehicle3dRig.LIGHT_REAR_FOG)
-    val blinkOn = uptimeMs % Vehicle3dRig.INDICATOR_PERIOD_MS < Vehicle3dRig.INDICATOR_PERIOD_MS / 2
-    if (blinkOn && input.leftIndicator) add(Vehicle3dRig.LIGHT_LEFT)
-    if (blinkOn && input.rightIndicator) add(Vehicle3dRig.LIGHT_RIGHT)
+    if (indicatorLampOn && input.leftIndicator) add(Vehicle3dRig.LIGHT_LEFT)
+    if (indicatorLampOn && input.rightIndicator) add(Vehicle3dRig.LIGHT_RIGHT)
 }
 
 /** Column-major 4x4 matrices, as OpenGL expects. Pure Kotlin so the scene logic runs in JVM tests. */

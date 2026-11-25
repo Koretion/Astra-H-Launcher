@@ -1022,4 +1022,17 @@
     <string name="tire_name_front_right">Anteriore destra</string>
     <string name="tire_name_rear_left">Posteriore sinistra</string>
     <string name="tire_name_rear_right">Posteriore destra</string>
+    <string name="diag_record">REGISTRA</string>
+    <string name="diag_record_stop">STOP %1$s</string>
+    <string name="diag_record_last">Ultima registrazione</string>
+    <string name="screen_record_title">Registrazione dello schermo</string>
+    <string name="screen_record_channel">Registrazione dello schermo</string>
+    <string name="screen_record_running">Registrazione dello schermo senza audio. Fermala qui o in Log e diagnostica.</string>
+    <string name="screen_record_stop_action">Ferma</string>
+    <string name="screen_record_saved">Video salvato in %1$s</string>
+    <string name="screen_record_failed">Impossibile registrare: %1$s</string>
+    <string name="screen_record_denied">La registrazione dello schermo non è stata consentita</string>
+    <string name="settings_search_hint">Cerca nelle impostazioni</string>
+    <string name="settings_search_results">%1$d risultati</string>
+    <string name="settings_search_empty">Nessuna impostazione corrisponde a «%1$s»</string>
 </resources>

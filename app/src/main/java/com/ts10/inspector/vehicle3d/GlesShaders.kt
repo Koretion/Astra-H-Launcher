@@ -249,3 +249,39 @@ void main() {
     gl_FragColor = vec4(uColor * a, a);
 }
 """
+
+// Detected road users: flat-lit boxes, fading with distance like the road they stand on.
+internal const val BOX_VERTEX_SHADER = """
+attribute vec3 aPosition;
+attribute vec3 aNormal;
+uniform mat4 uViewProj;
+uniform mat4 uModel;
+varying vec3 vNormal;
+varying vec3 vWorld;
+void main() {
+    vec4 world = uModel * vec4(aPosition, 1.0);
+    vWorld = world.xyz;
+    vNormal = mat3(uModel) * aNormal;
+    gl_Position = uViewProj * world;
+}
+"""
+
+internal const val BOX_FRAGMENT_SHADER = """
+precision mediump float;
+uniform vec3 uColor;
+uniform float uAlpha;
+uniform float uEmissive;
+uniform float uFrontZ;
+uniform float uFadeBottom;
+varying vec3 vNormal;
+varying vec3 vWorld;
+void main() {
+    vec3 n = normalize(vNormal);
+    float diffuse = max(dot(n, normalize(vec3(-0.35, 0.85, 0.45))), 0.0);
+    vec3 color = mix(uColor * (0.42 + 0.58 * diffuse), uColor, uEmissive);
+    float ahead = uFrontZ - vWorld.z;
+    float fade = 1.0 - smoothstep(16.0, 46.0, ahead);
+    float screen = smoothstep(0.0, uFadeBottom, gl_FragCoord.y);
+    gl_FragColor = vec4(color, uAlpha * fade * screen);
+}
+"""

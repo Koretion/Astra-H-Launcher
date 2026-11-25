@@ -157,14 +157,14 @@ class Vehicle3dSceneTest {
     @Test
     fun `lights follow confirmed signals and indicators blink`() {
         val input = Vehicle3dSceneInput(dippedBeam = true, brake = true, leftIndicator = true)
-        val on = vehicle3dLitNodes(input, uptimeMs = 0)
-        val off = vehicle3dLitNodes(input, uptimeMs = Vehicle3dRig.INDICATOR_PERIOD_MS / 2)
+        val on = vehicle3dLitNodes(input, indicatorLampOn = true)
+        val off = vehicle3dLitNodes(input, indicatorLampOn = false)
         assertTrue(Vehicle3dRig.LIGHT_POSITION in on && Vehicle3dRig.LIGHT_DIPPED in on)
         assertTrue(Vehicle3dRig.LIGHT_BRAKE in on && Vehicle3dRig.LIGHT_THIRD_BRAKE in on)
         assertTrue(Vehicle3dRig.LIGHT_LEFT in on)
         assertFalse(Vehicle3dRig.LIGHT_LEFT in off)
         assertFalse(Vehicle3dRig.LIGHT_HIGH in on)
-        assertEquals(emptySet<String>(), vehicle3dLitNodes(Vehicle3dSceneInput(), 0))
+        assertEquals(emptySet<String>(), vehicle3dLitNodes(Vehicle3dSceneInput(), true))
     }
 
     @Test
@@ -179,6 +179,33 @@ class Vehicle3dSceneTest {
         // +90 degrees about Y turns the car's front (-Z) towards its left (-X).
         assertArrayEquals(floatArrayOf(-1f, 0f, 0f), rotated, 1e-5f)
         assertArrayEquals(fromQuaternion, Mat4.rotation(90f, 0f, 1f, 0f), 1e-6f)
+    }
+
+    @Test
+    fun `road objects glide to detector updates and fade out when lost`() {
+        val animator = Vehicle3dSceneAnimator()
+        val car = Vehicle3dRoadObject(7, Vehicle3dRoadObjectKind.CAR, 0f, 10f, egoLane = true)
+        animator.step(Vehicle3dSceneInput(roadObjects = listOf(car)), 0.1f)
+        assertEquals(10f, animator.roadObjects.single().aheadMeters, 1e-4f)
+        assertTrue(animator.roadObjects.single().presence < 1f)
+
+        assertTrue(animator.step(Vehicle3dSceneInput(roadObjects = listOf(car.copy(aheadMeters = 20f))), 0.1f))
+        val gliding = animator.roadObjects.single().aheadMeters
+        assertTrue(gliding > 10f && gliding < 20f)
+
+        repeat(10) { animator.step(Vehicle3dSceneInput(), 0.1f) }
+        assertTrue(animator.roadObjects.isEmpty())
+    }
+
+    @Test
+    fun `unit cube has 36 vertices inside half a metre with unit normals`() {
+        val cube = unitCubeVertices()
+        assertEquals(36 * 6, cube.size)
+        for (vertex in 0 until 36) {
+            for (axis in 0 until 3) assertEquals(0.5f, abs(cube[vertex * 6 + axis]), 1e-6f)
+            val n = (3 until 6).sumOf { (cube[vertex * 6 + it] * cube[vertex * 6 + it]).toDouble() }
+            assertEquals(1.0, n, 1e-6)
+        }
     }
 
     private fun readPngInt(png: ByteArray, offset: Int): Int =

@@ -1022,4 +1022,17 @@
     <string name="tire_name_front_right">Delantera derecha</string>
     <string name="tire_name_rear_left">Trasera izquierda</string>
     <string name="tire_name_rear_right">Trasera derecha</string>
+    <string name="diag_record">GRABAR</string>
+    <string name="diag_record_stop">PARAR %1$s</string>
+    <string name="diag_record_last">Última grabación</string>
+    <string name="screen_record_title">Grabación de pantalla</string>
+    <string name="screen_record_channel">Grabación de pantalla</string>
+    <string name="screen_record_running">Grabando la pantalla sin sonido. Páralo aquí o en Log y diagnóstico.</string>
+    <string name="screen_record_stop_action">Parar</string>
+    <string name="screen_record_saved">Vídeo guardado en %1$s</string>
+    <string name="screen_record_failed">No se pudo grabar: %1$s</string>
+    <string name="screen_record_denied">No se permitió grabar la pantalla</string>
+    <string name="settings_search_hint">Buscar en ajustes</string>
+    <string name="settings_search_results">%1$d resultados</string>
+    <string name="settings_search_empty">Nada en ajustes coincide con «%1$s»</string>
 </resources>

@@ -1022,4 +1022,17 @@
     <string name="tire_name_front_right">Dianteiro direito</string>
     <string name="tire_name_rear_left">Traseiro esquerdo</string>
     <string name="tire_name_rear_right">Traseiro direito</string>
+    <string name="diag_record">GRAVAR</string>
+    <string name="diag_record_stop">PARAR %1$s</string>
+    <string name="diag_record_last">Última gravação</string>
+    <string name="screen_record_title">Gravação do ecrã</string>
+    <string name="screen_record_channel">Gravação do ecrã</string>
+    <string name="screen_record_running">A gravar o ecrã sem som. Pare aqui ou em Registo e diagnóstico.</string>
+    <string name="screen_record_stop_action">Parar</string>
+    <string name="screen_record_saved">Vídeo guardado em %1$s</string>
+    <string name="screen_record_failed">Não foi possível gravar: %1$s</string>
+    <string name="screen_record_denied">A gravação do ecrã não foi permitida</string>
+    <string name="settings_search_hint">Pesquisar nas definições</string>
+    <string name="settings_search_results">%1$d resultados</string>
+    <string name="settings_search_empty">Nada nas definições corresponde a «%1$s»</string>
 </resources>

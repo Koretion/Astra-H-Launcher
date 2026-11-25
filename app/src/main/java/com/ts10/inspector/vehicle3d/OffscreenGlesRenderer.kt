@@ -2,6 +2,11 @@ package com.ts10.inspector.vehicle3d
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ColorSpace
+import android.graphics.PixelFormat
+import android.hardware.HardwareBuffer
+import android.media.Image
+import android.media.ImageReader
 import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLContext
@@ -22,6 +27,8 @@ internal class OffscreenGlesRenderer(
     private val width: Int,
     private val height: Int,
     private val model: Vehicle3dGlbModel,
+    /** Render into an ImageReader and hand Compose a hardware bitmap instead of reading pixels back. */
+    preferHardwareOutput: Boolean = true,
 ) {
     private var display: EGLDisplay = EGL14.EGL_NO_DISPLAY
     private var context: EGLContext = EGL14.EGL_NO_CONTEXT
@@ -32,10 +39,16 @@ internal class OffscreenGlesRenderer(
     private val shadowProgram: Int
     private val buffers = IntArray(3)
     private val textures: IntArray
-    private val pixels: IntBuffer = IntBuffer.allocate(width * height)
-    private val argb = IntArray(width * height)
-    private val bitmaps = List(3) { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) }
+    // Only the glReadPixels fallback needs CPU copies of the frame.
+    private val pixels: IntBuffer by lazy { IntBuffer.allocate(width * height) }
+    private val argb by lazy { IntArray(width * height) }
+    private val bitmaps by lazy { List(3) { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) } }
     private var nextBitmap = 0
+    private var imageReader: ImageReader? = null
+    /** Frames on screen or possibly still drawn by the RenderThread; older ones go back to the reader. */
+    private val heldFrames = ArrayDeque<Image>()
+    val hardwareOutput: Boolean get() = imageReader != null
+    val outputPath: String get() = if (hardwareOutput) "ImageReader hardware bitmap" else "glReadPixels"
 
     private val restLocal: List<FloatArray> = model.nodes.map { Mat4.fromTrs(it.translation, it.rotation, it.scale) }
     private val lightNodes: Map<Int, String> = Vehicle3dRig.ALL_LIGHTS.associateBy { model.nodeIndex(it) }.filterKeys { it >= 0 }
@@ -117,15 +130,36 @@ internal class OffscreenGlesRenderer(
     private val dippedBeams: List<FloatBuffer>
     private val highBeams: List<FloatBuffer>
     private val fogBeams: List<FloatBuffer>
+    private val boxProgram: Int
+    private val xViewProj: Int
+    private val xModel: Int
+    private val xPosition: Int
+    private val xNormal: Int
+    private val xColor: Int
+    private val xAlpha: Int
+    private val xEmissive: Int
+    private val xFrontZ: Int
+    private val xFadeBottom: Int
+    private val unitCube: FloatBuffer = floatBuffer(unitCubeVertices())
 
     init {
-        createEgl()
+        createEgl(preferHardwareOutput)
         program = linkProgram(VERTEX_SHADER, FRAGMENT_SHADER)
         shadowProgram = linkProgram(SHADOW_VERTEX_SHADER, SHADOW_FRAGMENT_SHADER)
         floorProgram = linkProgram(SHADOW_VERTEX_SHADER, FLOOR_FRAGMENT_SHADER)
         roadProgram = linkProgram(ROAD_VERTEX_SHADER, ROAD_FRAGMENT_SHADER)
         poolProgram = linkProgram(SHADOW_VERTEX_SHADER, POOL_FRAGMENT_SHADER)
         beamProgram = linkProgram(BEAM_VERTEX_SHADER, BEAM_FRAGMENT_SHADER)
+        boxProgram = linkProgram(BOX_VERTEX_SHADER, BOX_FRAGMENT_SHADER)
+        xViewProj = GLES20.glGetUniformLocation(boxProgram, "uViewProj")
+        xModel = GLES20.glGetUniformLocation(boxProgram, "uModel")
+        xPosition = GLES20.glGetAttribLocation(boxProgram, "aPosition")
+        xNormal = GLES20.glGetAttribLocation(boxProgram, "aNormal")
+        xColor = GLES20.glGetUniformLocation(boxProgram, "uColor")
+        xAlpha = GLES20.glGetUniformLocation(boxProgram, "uAlpha")
+        xEmissive = GLES20.glGetUniformLocation(boxProgram, "uEmissive")
+        xFrontZ = GLES20.glGetUniformLocation(boxProgram, "uFrontZ")
+        xFadeBottom = GLES20.glGetUniformLocation(boxProgram, "uFadeBottom")
         rViewProj = GLES20.glGetUniformLocation(roadProgram, "uViewProj")
         rModel = GLES20.glGetUniformLocation(roadProgram, "uModel")
         rPosition = GLES20.glGetAttribLocation(roadProgram, "aPosition")
@@ -242,30 +276,69 @@ internal class OffscreenGlesRenderer(
         fogBeams = lamps.fogLamps.map { beamCone(it, FOG_BEAM) }
     }
 
-    private fun createEgl() {
+    private fun createEgl(preferHardwareOutput: Boolean) {
         display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         check(display != EGL14.EGL_NO_DISPLAY) { "No EGL display" }
         check(EGL14.eglInitialize(display, IntArray(2), 0, IntArray(2), 0)) { "eglInitialize" }
-        val config = chooseConfig(samples = 4)?.also { multisampled = true }
-            ?: checkNotNull(chooseConfig(samples = 0)) { "eglChooseConfig" }
-        context = EGL14.eglCreateContext(
-            display, config, EGL14.EGL_NO_CONTEXT,
-            intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE), 0,
-        )
-        check(context != EGL14.EGL_NO_CONTEXT) { "eglCreateContext" }
+        if (!preferHardwareOutput || !createHardwareOutput()) createPbufferOutput()
+        check(EGL14.eglMakeCurrent(display, surface, surface, context)) { "eglMakeCurrent" }
+    }
+
+    /**
+     * The ImageReader surface is consumed inside this process, never by the compositor, so it does
+     * not share the SurfaceView/TextureView conflicts seen with Filament on the TS10.
+     */
+    private fun createHardwareOutput(): Boolean {
+        val reader = runCatching {
+            ImageReader.newInstance(
+                width, height, PixelFormat.RGBA_8888, READER_MAX_IMAGES,
+                HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT,
+            )
+        }.getOrElse { return false }
+        for (samples in intArrayOf(4, 0)) {
+            val config = chooseConfig(samples, EGL14.EGL_WINDOW_BIT) ?: continue
+            val candidate = createContext(config) ?: continue
+            val window = runCatching {
+                EGL14.eglCreateWindowSurface(display, config, reader.surface, intArrayOf(EGL14.EGL_NONE), 0)
+            }.getOrNull()
+            if (window == null || window == EGL14.EGL_NO_SURFACE) {
+                EGL14.eglDestroyContext(display, candidate)
+                continue
+            }
+            context = candidate
+            surface = window
+            multisampled = samples > 0
+            imageReader = reader
+            // The reader is not paced by vsync; a swap must never wait for one.
+            EGL14.eglMakeCurrent(display, surface, surface, context)
+            EGL14.eglSwapInterval(display, 0)
+            return true
+        }
+        reader.close()
+        return false
+    }
+
+    private fun createPbufferOutput() {
+        val config = chooseConfig(samples = 4, EGL14.EGL_PBUFFER_BIT)?.also { multisampled = true }
+            ?: checkNotNull(chooseConfig(samples = 0, EGL14.EGL_PBUFFER_BIT)) { "eglChooseConfig" }
+        context = checkNotNull(createContext(config)) { "eglCreateContext" }
         surface = EGL14.eglCreatePbufferSurface(
             display, config,
             intArrayOf(EGL14.EGL_WIDTH, width, EGL14.EGL_HEIGHT, height, EGL14.EGL_NONE), 0,
         )
         check(surface != EGL14.EGL_NO_SURFACE) { "eglCreatePbufferSurface" }
-        check(EGL14.eglMakeCurrent(display, surface, surface, context)) { "eglMakeCurrent" }
     }
 
-    private fun chooseConfig(samples: Int): EGLConfig? {
+    private fun createContext(config: EGLConfig): EGLContext? = EGL14.eglCreateContext(
+        display, config, EGL14.EGL_NO_CONTEXT,
+        intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE), 0,
+    ).takeIf { it != EGL14.EGL_NO_CONTEXT }
+
+    private fun chooseConfig(samples: Int, surfaceType: Int): EGLConfig? {
         val configs = arrayOfNulls<EGLConfig>(1)
         val count = IntArray(1)
         val attributes = intArrayOf(
-            EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
+            EGL14.EGL_SURFACE_TYPE, surfaceType,
             EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
             EGL14.EGL_RED_SIZE, 8, EGL14.EGL_GREEN_SIZE, 8,
             EGL14.EGL_BLUE_SIZE, 8, EGL14.EGL_ALPHA_SIZE, 8,
@@ -357,7 +430,10 @@ internal class OffscreenGlesRenderer(
         GLES20.glViewport(0, 0, width, viewportHeight)
         val background = if (input.dark) DARK_BACKGROUND else LIGHT_BACKGROUND
         // The aerial view sits on the tyre card, so its frame is transparent and has no floor.
-        GLES20.glClearColor(background[0], background[1], background[2], if (input.topView) 0f else 1f)
+        // A hardware bitmap is premultiplied: the transparent aerial frame must clear to black or the
+        // background colour would be added over the tyre card.
+        if (input.topView && hardwareOutput) GLES20.glClearColor(0f, 0f, 0f, 0f)
+        else GLES20.glClearColor(background[0], background[1], background[2], if (input.topView) 0f else 1f)
         val showroom = if (input.topView) 1f else animator.showroom
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         // Desde el interior y con tema oscuro, por los cristales se ve un atardecer en vez de negro,
@@ -405,7 +481,10 @@ internal class OffscreenGlesRenderer(
             drawVehicle(viewProj, mirroredEye, motions, litLights, paint, input.dark, background, floor, reflection)
             drawBeams(viewProj, input, mirrored = true, strength = reflection / DARK_REFLECTION * MIRRORED_BEAM)
         }
-        if (!input.topView && showroom < 1f) drawRoad(viewProj, input, animator, 1f - showroom)
+        if (!input.topView && showroom < 1f) {
+            drawRoad(viewProj, input, animator, 1f - showroom)
+            drawRoadObjects(viewProj, input, animator, 1f - showroom)
+        }
         drawShadow(viewProj, input.dark)
         if (!input.topView) drawLightPools(viewProj, input)
         drawVehicle(viewProj, eye, motions, litLights, paint, input.dark, background, floor, reflection = 0f)
@@ -414,6 +493,13 @@ internal class OffscreenGlesRenderer(
 
         GLES20.glFinish()
         val drawFinished = System.nanoTime()
+        imageReader?.let { reader ->
+            val bitmap = publishHardwareFrame(reader)
+            lastDrawNs = drawFinished - drawStarted
+            lastReadbackNs = System.nanoTime() - drawFinished
+            lastConvertNs = 0L
+            return bitmap
+        }
         pixels.clear()
         GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixels)
         val readFinished = System.nanoTime()
@@ -425,6 +511,38 @@ internal class OffscreenGlesRenderer(
         lastDrawNs = drawFinished - drawStarted
         lastReadbackNs = readFinished - drawFinished
         lastConvertNs = System.nanoTime() - readFinished
+        return bitmap
+    }
+
+    /**
+     * glFinish above already waited for the GPU, so the queued buffer is complete when HWUI samples
+     * it. The bitmap shares the buffer: an image only returns to the reader once newer frames
+     * exist, the same margin the three rotating CPU bitmaps gave.
+     */
+    private fun publishHardwareFrame(reader: ImageReader): Bitmap {
+        check(EGL14.eglSwapBuffers(display, surface)) { "eglSwapBuffers 0x${Integer.toHexString(EGL14.eglGetError())}" }
+        var image = reader.acquireLatestImage()
+        var attempts = 0
+        while (image == null && attempts++ < ACQUIRE_RETRIES) {
+            Thread.sleep(1)
+            image = reader.acquireLatestImage()
+        }
+        checkNotNull(image) { "ImageReader returned no frame" }
+        val bitmap = try {
+            val buffer = checkNotNull(image.hardwareBuffer) { "Frame without HardwareBuffer" }
+            try {
+                checkNotNull(Bitmap.wrapHardwareBuffer(buffer, ColorSpace.get(ColorSpace.Named.SRGB))) {
+                    "wrapHardwareBuffer rejected the frame"
+                }
+            } finally {
+                buffer.close()
+            }
+        } catch (error: Throwable) {
+            image.close()
+            throw error
+        }
+        heldFrames.addLast(image)
+        while (heldFrames.size > HELD_FRAMES) heldFrames.removeFirst().close()
         return bitmap
     }
 
@@ -620,6 +738,70 @@ internal class OffscreenGlesRenderer(
         GLES20.glDisable(GLES20.GL_BLEND)
     }
 
+    /**
+     * Camera detections as simple volumes on the road. Instancing the GLB would cost as much as the
+     * car itself per object (the frame is vertex bound), so a handful of boxes stands in for each.
+     */
+    private fun drawRoadObjects(
+        viewProj: FloatArray,
+        input: Vehicle3dSceneInput,
+        animator: Vehicle3dSceneAnimator,
+        opacity: Float,
+    ) {
+        val objects = animator.roadObjects
+        if (objects.isEmpty() || opacity <= 0f) return
+        GLES20.glUseProgram(boxProgram)
+        GLES20.glUniformMatrix4fv(xViewProj, 1, false, viewProj, 0)
+        GLES20.glUniform1f(xFrontZ, lamps.frontZ)
+        GLES20.glUniform1f(xFadeBottom, height * BOTTOM_FADE * 0.5f)
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+        unitCube.position(0)
+        GLES20.glVertexAttribPointer(xPosition, 3, GLES20.GL_FLOAT, false, CUBE_STRIDE_BYTES, unitCube)
+        unitCube.position(3)
+        GLES20.glVertexAttribPointer(xNormal, 3, GLES20.GL_FLOAT, false, CUBE_STRIDE_BYTES, unitCube)
+        GLES20.glEnableVertexAttribArray(xPosition)
+        GLES20.glEnableVertexAttribArray(xNormal)
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA, GLES20.GL_ZERO, GLES20.GL_ONE)
+        val curve = input.roadCurve * ROAD_CURVE_METERS
+        val relationBlend = if (input.dark) DARK_OBJECT_BODY else LIGHT_OBJECT_BODY
+        // Farthest first so the nearer translucent volumes blend over them.
+        objects.sortedByDescending { it.aheadMeters }.forEach { obj ->
+            val parts = ROAD_OBJECT_PARTS.getValue(obj.kind)
+            val length = ROAD_OBJECT_LENGTH.getValue(obj.kind)
+            val ahead = obj.aheadMeters + length / 2f
+            // Same bend as the road shader: lateral offset c*d^2, heading along its derivative.
+            val yaw = -kotlin.math.atan(2f * curve * ahead)
+            val half = yaw / 2f
+            val objectFrame = Mat4.fromTrs(
+                floatArrayOf(center[0] + obj.lateralLanes * LANE_WIDTH_METERS + curve * ahead * ahead, groundY, lamps.frontZ - ahead),
+                floatArrayOf(0f, sin(half), 0f, cos(half)),
+                floatArrayOf(1f, 1f, 1f),
+            )
+            val relation = if (obj.egoLane) EGO_LANE_OBJECT else OTHER_LANE_OBJECT
+            val body = FloatArray(3) { relationBlend[it] + (relation[it] - relationBlend[it]) * OBJECT_TINT }
+            val alpha = OBJECT_ALPHA * obj.presence * opacity
+            parts.forEach { part ->
+                val color = when (part.role) {
+                    PartRole.BODY -> body
+                    PartRole.GLASS -> OBJECT_GLASS
+                    PartRole.TYRE -> OBJECT_TYRE
+                    PartRole.TAIL -> OBJECT_TAIL
+                }
+                val position = Mat4.transformPoint(objectFrame, part.x, part.y, part.z)
+                val model = Mat4.fromTrs(position, floatArrayOf(0f, sin(half), 0f, cos(half)), part.size)
+                GLES20.glUniformMatrix4fv(xModel, 1, false, model, 0)
+                GLES20.glUniform3fv(xColor, 1, color, 0)
+                GLES20.glUniform1f(xAlpha, alpha)
+                GLES20.glUniform1f(xEmissive, if (part.role == PartRole.TAIL) 1f else 0f)
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36)
+            }
+        }
+        GLES20.glDisableVertexAttribArray(xPosition)
+        GLES20.glDisableVertexAttribArray(xNormal)
+        GLES20.glDisable(GLES20.GL_BLEND)
+    }
+
     /** Light that the lamps throw on the floor or the road, added on top of it. */
     private fun drawLightPools(viewProj: FloatArray, input: Vehicle3dSceneInput) {
         val themeGain = if (input.dark) 1f else LIGHT_THEME_GAIN
@@ -770,6 +952,7 @@ internal class OffscreenGlesRenderer(
         GLES20.glDeleteProgram(shadowProgram)
         GLES20.glDeleteProgram(floorProgram)
         GLES20.glDeleteProgram(roadProgram)
+        GLES20.glDeleteProgram(boxProgram)
         GLES20.glDeleteProgram(poolProgram)
         GLES20.glDeleteProgram(beamProgram)
         EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
@@ -777,10 +960,18 @@ internal class OffscreenGlesRenderer(
         EGL14.eglDestroyContext(display, context)
         EGL14.eglTerminate(display)
         display = EGL14.EGL_NO_DISPLAY
+        // Published hardware bitmaps keep their own buffer reference and stay drawable.
+        heldFrames.forEach { it.close() }
+        heldFrames.clear()
+        imageReader?.close()
+        imageReader = null
         // Bitmaps are not recycled: Compose may still be drawing the last published frame.
     }
 
     private companion object {
+        const val READER_MAX_IMAGES = 5
+        const val HELD_FRAMES = 3
+        const val ACQUIRE_RETRIES = 20
         const val LAMP_EMISSIVE_GAIN = 3.2f
         const val THIRD_BRAKE_HALO_WIDTH = 0.42f
         const val THIRD_BRAKE_HALO_HEIGHT = 0.12f

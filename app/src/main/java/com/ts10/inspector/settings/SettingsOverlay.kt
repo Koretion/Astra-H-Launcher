@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,6 +33,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Warning
@@ -79,6 +85,39 @@ private enum class ControlDetail(@StringRes val title: Int) {
     GMLAN_UPDATE(R.string.settings_detail_gmlan_update),
     LAUNCHER_UPDATE(R.string.settings_detail_launcher_update),
     VEHICLE_PROFILE(R.string.settings_detail_vehicle_profile),
+}
+
+/** Screen a detail is reached from, so a search result opens the same path as by hand. */
+private val ControlDetail.parent: ControlSection
+    get() = when (this) {
+        ControlDetail.OBD2, ControlDetail.ESP32 -> ControlSection.CONNECTIONS
+        ControlDetail.TRACKING -> ControlSection.TRIPS
+        ControlDetail.APPLICATIONS -> ControlSection.APPLICATIONS
+        else -> ControlSection.SYSTEM
+    }
+
+private const val SECTION_TARGET = "section:"
+private const val DETAIL_TARGET = "detail:"
+
+/** Every section and detail screen with the localized texts it shows (see SettingsSearchIndex). */
+private fun settingsSearchTargets(context: android.content.Context): List<SettingsSearchTarget> {
+    val resources = com.ts10.inspector.ui.AppLocale.resources(context)
+    // getString without arguments: format placeholders are kept and stripped by the search.
+    fun texts(ids: IntArray?) = ids?.map { resources.getString(it) }.orEmpty()
+    val sections = ControlSection.entries.map { section ->
+        val title = resources.getString(section.title)
+        SettingsSearchTarget(SECTION_TARGET + section.name, title, title, texts(SETTINGS_SECTION_SEARCH_STRINGS[section.name]))
+    }
+    val details = ControlDetail.entries.map { detail ->
+        val title = resources.getString(detail.title)
+        SettingsSearchTarget(
+            DETAIL_TARGET + detail.name,
+            title,
+            "${resources.getString(detail.parent.title)} › $title",
+            texts(SETTINGS_DETAIL_SEARCH_STRINGS[detail.name]),
+        )
+    }
+    return sections + details
 }
 
 private object SettingsNavigationSession {
@@ -144,6 +183,14 @@ internal fun DashboardSettingsOverlay(layout: LauncherLayout, onDismiss: () -> U
         mutableStateOf(restoredNavigation.applicationPicker)
     }
     val menuWidth = 132f
+    var searchQuery by remember { mutableStateOf("") }
+    // The language can change with the driver profile; rebuild the texts with the configuration.
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val searchTargets = remember(context, configuration) { settingsSearchTargets(context) }
+    val searchHits = remember(searchQuery, searchTargets) {
+        if (searchQuery.trim().length < MIN_SEARCH_CHARACTERS) null else searchSettings(searchQuery, searchTargets)
+    }
+    val focusManager = LocalFocusManager.current
     LaunchedEffect(section) {
         VehicleSceneFocusRequest.set(
             when (section) {
@@ -220,7 +267,7 @@ internal fun DashboardSettingsOverlay(layout: LauncherLayout, onDismiss: () -> U
                     modifier = Modifier.size(layout.dp(panelWidth - menuWidth - 32f), layout.dp(28)),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (detail != null) {
+                    if (detail != null && searchHits == null) {
                         Icon(
                             Icons.AutoMirrored.Outlined.ArrowBack,
                             stringResource(R.string.common_back),
@@ -236,7 +283,12 @@ internal fun DashboardSettingsOverlay(layout: LauncherLayout, onDismiss: () -> U
                     } else {
                         Box(modifier = Modifier.size(layout.dp(23)))
                     }
-                    Box(modifier = Modifier.weight(1f))
+                    SettingsSearchField(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it.take(MAX_SEARCH_CHARACTERS) },
+                        layout = settingsLayout,
+                        modifier = Modifier.weight(1f).padding(end = layout.dp(10)),
+                    )
                     Row(
                         modifier = Modifier
                             .padding(end = layout.dp(10))
@@ -273,7 +325,11 @@ internal fun DashboardSettingsOverlay(layout: LauncherLayout, onDismiss: () -> U
                     )
                 }
                 Text(
-                    stringResource(detail?.title ?: section.title),
+                    if (searchHits != null) {
+                        stringResource(R.string.settings_search_results, searchHits.size)
+                    } else {
+                        stringResource(detail?.title ?: section.title)
+                    },
                     color = colors.primary,
                     fontSize = settingsLayout.sp(17),
                     fontWeight = FontWeight.Bold,
@@ -285,7 +341,20 @@ internal fun DashboardSettingsOverlay(layout: LauncherLayout, onDismiss: () -> U
                 )
                 val contentWidth = panelWidth - menuWidth - 32f
                 val contentHeight = panelHeight - 80f
-                when (detail) {
+                if (searchHits != null) {
+                    SettingsSearchResults(searchQuery, searchHits, settingsLayout, contentWidth, contentHeight) { target ->
+                        val nextDetail = target.id.takeIf { it.startsWith(DETAIL_TARGET) }
+                            ?.let { ControlDetail.valueOf(it.removePrefix(DETAIL_TARGET)) }
+                        val nextSection = nextDetail?.parent
+                            ?: ControlSection.valueOf(target.id.removePrefix(SECTION_TARGET))
+                        section = nextSection
+                        detail = nextDetail
+                        requestedApplicationPicker = null
+                        searchQuery = ""
+                        focusManager.clearFocus()
+                        saveNavigation(nextSection, nextDetail, null)
+                    }
+                } else when (detail) {
                     ControlDetail.OBD2 -> Obd2SettingsPanel(settingsLayout, contentWidth, contentHeight)
                     ControlDetail.ESP32 -> Esp32SettingsPanel(settingsLayout, contentWidth, contentHeight)
                     ControlDetail.TRACKING -> VehicleTrackingSettingsPanel(settingsLayout, contentWidth, contentHeight)
@@ -322,6 +391,107 @@ internal fun DashboardSettingsOverlay(layout: LauncherLayout, onDismiss: () -> U
         }
     }
 }
+
+@Composable
+private fun SettingsSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    layout: LauncherLayout,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalDashboardColors.current
+    Row(
+        modifier = modifier
+            .background(colors.primary.copy(alpha = if (colors.dark) .08f else .05f), RoundedCornerShape(layout.dp(15)))
+            .padding(horizontal = layout.dp(8), vertical = layout.dp(5)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Search, null, tint = colors.muted, modifier = Modifier.size(layout.dp(16)))
+        Box(modifier = Modifier.weight(1f).padding(start = layout.dp(5))) {
+            if (query.isEmpty()) {
+                Text(
+                    stringResource(R.string.settings_search_hint),
+                    color = colors.muted,
+                    fontSize = layout.sp(9),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = TextStyle(color = colors.primary, fontSize = layout.sp(9)),
+                cursorBrush = SolidColor(colors.primary),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (query.isNotEmpty()) {
+            Icon(
+                Icons.Outlined.Close,
+                stringResource(R.string.common_close),
+                tint = colors.muted,
+                modifier = Modifier.size(layout.dp(16)).clickable { onQueryChange("") },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSearchResults(
+    query: String,
+    hits: List<SettingsSearchHit>,
+    layout: LauncherLayout,
+    width: Float,
+    height: Float,
+    onOpen: (SettingsSearchTarget) -> Unit,
+) {
+    val colors = LocalDashboardColors.current
+    LazyColumn(modifier = Modifier.size(layout.dp(width), layout.dp(height))) {
+        if (hits.isEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.settings_search_empty, query.trim()),
+                    color = colors.muted,
+                    fontSize = layout.sp(10),
+                    modifier = Modifier.padding(vertical = layout.dp(12)),
+                )
+            }
+        }
+        items(hits.size) { index ->
+            val hit = hits[index]
+            Column(
+                modifier = Modifier
+                    .padding(vertical = layout.dp(3))
+                    .teslaControlSurface(colors, layout)
+                    .clickable { onOpen(hit.target) }
+                    .padding(horizontal = layout.dp(11), vertical = layout.dp(8)),
+            ) {
+                Text(
+                    hit.target.path,
+                    color = colors.primary,
+                    fontSize = layout.sp(10),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (hit.matches.isNotEmpty()) {
+                    Text(
+                        hit.matches.take(MAX_MATCHES_SHOWN).joinToString(" · "),
+                        color = colors.muted,
+                        fontSize = layout.sp(8),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private const val MIN_SEARCH_CHARACTERS = 2
+private const val MAX_SEARCH_CHARACTERS = 40
+private const val MAX_MATCHES_SHOWN = 3
 
 @Composable
 private fun ControlMenuItem(

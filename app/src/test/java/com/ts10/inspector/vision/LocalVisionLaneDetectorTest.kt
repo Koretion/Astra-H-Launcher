@@ -103,29 +103,6 @@ class LocalVisionLaneDetectorTest {
     }
 
     @Test
-    fun `tracks a completed change from the right lane to the left lane`() {
-        val tracker = RoadLanePositionTracker()
-        val departure = shiftedLane(0.12f)
-
-        tracker.noteIndicators(left = true, right = false, nowMs = 1_000L)
-        repeat(6) { assertEquals(0, tracker.update(departure, 2, nowMs = 2_000L + it)) }
-        assertEquals(1, tracker.update(lane(), 2, nowMs = 3_000L))
-    }
-
-    @Test
-    fun `does not count a visual excursion without a matching indicator`() {
-        val tracker = RoadLanePositionTracker()
-        val departure = shiftedLane(0.12f)
-
-        repeat(3) { tracker.update(departure, 2, nowMs = 2_000L + it) }
-        assertEquals(0, tracker.update(lane(), 2, nowMs = 3_000L))
-
-        tracker.noteIndicators(left = false, right = true, nowMs = 4_000L)
-        repeat(3) { tracker.update(departure, 2, nowMs = 4_100L + it) }
-        assertEquals(0, tracker.update(lane(), 2, nowMs = 5_000L))
-    }
-
-    @Test
     fun `derives signed road curvature while keeping the car static`() {
         assertEquals(0f, roadCurveFromLane(lane()), 0.001f)
         assertTrue(roadCurveFromLane(shiftedFarLane(-0.10f)) < 0f)
@@ -167,23 +144,6 @@ class LocalVisionLaneDetectorTest {
         val weak = lane().copy(confidence = 0.17f)
 
         assertEquals(0f, roadCurveFromLane(weak), 0.001f)
-        assertEquals(
-            0,
-            RoadLanePositionTracker().update(
-                shiftedLane(0.12f).copy(confidence = 0.17f),
-                2,
-                nowMs = 1_000L,
-            ),
-        )
-    }
-
-    @Test
-    fun `real camera confidence can confirm an indicator backed lane change`() {
-        val tracker = RoadLanePositionTracker()
-        val departure = shiftedLane(0.12f).copy(confidence = 0.19f)
-        tracker.noteIndicators(left = true, right = false, nowMs = 1_000L)
-        repeat(6) { assertEquals(0, tracker.update(departure, 2, nowMs = 2_000L + it)) }
-        assertEquals(1, tracker.update(lane().copy(confidence = 0.19f), 2, nowMs = 3_000L))
     }
 
     private fun lane() = RoadLaneGeometry(

@@ -53,7 +53,6 @@ import com.ts10.inspector.camera.AdasWarning
 import com.ts10.inspector.camera.GrabadoraHdAdasClient
 import com.ts10.inspector.camera.GrabadoraHdCameraClient
 import com.ts10.inspector.camera.withWarningVehicleFallback
-import com.ts10.inspector.diagnostics.TelemetryLog
 import com.ts10.inspector.environment.OsmRoadContext
 import com.ts10.inspector.environment.OsmRoadContextProvider
 import com.ts10.inspector.launcher.LauncherRuntime
@@ -70,7 +69,7 @@ import com.ts10.inspector.vision.LocalVisionLaneDetector
 import com.ts10.inspector.vision.LocalVisionObjectDetector
 import com.ts10.inspector.vision.LocalVisionPipeline
 import com.ts10.inspector.vision.RoadLaneGeometry
-import com.ts10.inspector.vision.RoadLanePositionTracker
+import com.ts10.inspector.vision.LaneChangeEstimator
 import com.ts10.inspector.vision.RoadObjectKind
 import com.ts10.inspector.vision.TrackedRoadObject
 import com.ts10.inspector.vision.TrafficLightColor
@@ -79,8 +78,6 @@ import com.ts10.inspector.vision.roadCurveFromLane
 import com.ts10.inspector.vision.roadCurveFromSteering
 import com.ts10.inspector.vision.roadCurveOffsetFraction
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
 @Composable
@@ -93,40 +90,15 @@ internal fun RuntimeVehicleView(
 ) {
     val state by LauncherRuntime.vehicleVisualState.collectAsStateWithLifecycle()
     val signals by VehicleSignalHub.state.collectAsStateWithLifecycle()
-    val blinkers by remember {
-        LauncherRuntime.state.map { it.leftBlinker to it.rightBlinker }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(false to false)
     val steeringAngle = signals.steeringAngleDegrees?.value
     val adasState by GrabadoraHdAdasClient.state.collectAsStateWithLifecycle()
     val cameraState by GrabadoraHdCameraClient.state.collectAsStateWithLifecycle()
     val localVision by LocalVisionObjectDetector.state.collectAsStateWithLifecycle()
     val localLanes by LocalVisionLaneDetector.state.collectAsStateWithLifecycle()
     val osmRoad by OsmRoadContextProvider.state.collectAsStateWithLifecycle()
-    val lanePositionTracker = remember { RoadLanePositionTracker() }
-    var activeLaneFromRight by remember { mutableStateOf(0) }
+    // Indicators, steering shape, camera and OSM are fused by LaneChangeEstimator outside Compose.
+    val activeLaneFromRight by LaneChangeEstimator.laneFromRight.collectAsStateWithLifecycle()
     val forwardCameraSelected = isForwardCameraPosition(cameraState.selectedPosition)
-    LaunchedEffect(blinkers) {
-        lanePositionTracker.noteIndicators(
-            left = blinkers.first,
-            right = blinkers.second,
-        )
-    }
-    LaunchedEffect(localLanes.stableLane, osmRoad.road?.lanesInTravelDirection, forwardCameraSelected) {
-        val nextLane = if (forwardCameraSelected) {
-            lanePositionTracker.update(localLanes.stableLane, osmRoad.road?.lanesInTravelDirection)
-        } else {
-            lanePositionTracker.reset()
-            0
-        }
-        if (nextLane != activeLaneFromRight) {
-            TelemetryLog.event(
-                "LANE_POSITION",
-                "fromRight=$nextLane lanes=${osmRoad.road?.lanesInTravelDirection ?: 1}",
-            )
-        }
-        activeLaneFromRight = nextLane
-        vehicle3dActiveLaneFromRight.value = nextLane
-    }
     val offscreenRequested = vehicleSceneMode == VehicleSceneMode.THREE_D
     val offscreenState by Vehicle3dOffscreenEngine.state.collectAsStateWithLifecycle()
     // The OpenGL vehicle replaces the road scene both parked and moving (owner's choice): it shows

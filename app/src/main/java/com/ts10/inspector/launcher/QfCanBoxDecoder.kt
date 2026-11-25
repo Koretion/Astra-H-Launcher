@@ -263,16 +263,19 @@ internal object QfCanBoxDecoder {
         val highBeam = lights and 0x80 != 0
         val positionLights = secondaryLights and 0xc0 != 0
         val now = SystemClock.elapsedRealtime()
+        val direct = VehicleStateFusion.directCanBodyFreshness(now = now)
+        val keepTurn = dedicatedTurnDataReceived || direct.turn
         LauncherStore.state.update {
             it.copy(
-                leftBlinker = if (dedicatedTurnDataReceived) it.leftBlinker else lights and 0x04 != 0,
-                rightBlinker = if (dedicatedTurnDataReceived) it.rightBlinker else lights and 0x08 != 0,
-                hazard = if (dedicatedTurnDataReceived) it.hazard else lights and 0x02 != 0,
-                handbrake = chassis and 0x10 != 0,
-                headlights = dippedBeam || highBeam || positionLights || lights and 0x01 != 0,
+                leftBlinker = if (keepTurn) it.leftBlinker else lights and 0x04 != 0,
+                rightBlinker = if (keepTurn) it.rightBlinker else lights and 0x08 != 0,
+                hazard = if (keepTurn) it.hazard else lights and 0x02 != 0,
+                handbrake = if (direct.handbrake) it.handbrake else chassis and 0x10 != 0,
+                headlights = if (direct.exteriorLights) it.headlights
+                else dippedBeam || highBeam || positionLights || lights and 0x01 != 0,
                 dippedBeam = dippedBeam,
-                highBeam = highBeam,
-                positionLights = positionLights,
+                highBeam = if (direct.highBeam) it.highBeam else highBeam,
+                positionLights = if (direct.exteriorLights) it.positionLights else positionLights,
                 lowFuel = fuelLitres in 0.1f..LOW_FUEL_LITRES,
                 brakeAlert = chassis and 0x10 != 0 || secondaryLights and 0x18 != 0,
             )

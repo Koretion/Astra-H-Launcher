@@ -32,10 +32,19 @@ import com.ts10.inspector.vehicle.can.SwWindowAction
 import com.ts10.inspector.vehicle3d.VEHICLE_3D_DRIVING_KMH
 import com.ts10.inspector.vehicle3d.Vehicle3dFocus
 import com.ts10.inspector.vehicle3d.Vehicle3dOffscreenEngine
+import com.ts10.inspector.vehicle3d.Vehicle3dRoadObject
+import com.ts10.inspector.vehicle3d.Vehicle3dRoadObjectKind
 import com.ts10.inspector.vehicle3d.Vehicle3dSceneInput
+import com.ts10.inspector.camera.GrabadoraHdCameraClient
+import com.ts10.inspector.vision.LaneChangeEstimator
+import com.ts10.inspector.vision.LocalVisionObjectDetector
+import com.ts10.inspector.vision.LocalVisionPipeline
+import com.ts10.inspector.vision.RoadLaneRelation
+import com.ts10.inspector.vision.RoadObjectKind
+import com.ts10.inspector.vision.TrackedRoadObject
+import com.ts10.inspector.vision.projectTrackedRoadObject
 import com.ts10.inspector.vision.resolveRenderedRoadCurve
 import com.ts10.inspector.vision.roadCurveFromSteering
-import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
 internal fun Vehicle3dDashboardView(
@@ -74,7 +83,10 @@ internal fun Vehicle3dSceneFeeder(
     val launcherState by LauncherRuntime.state.collectAsStateWithLifecycle()
     val signals by VehicleSignalHub.state.collectAsStateWithLifecycle()
     val osmRoad by OsmRoadContextProvider.state.collectAsStateWithLifecycle()
-    val activeLane by vehicle3dActiveLaneFromRight.collectAsStateWithLifecycle()
+    val activeLane by LaneChangeEstimator.laneFromRight.collectAsStateWithLifecycle()
+    val cameraState by GrabadoraHdCameraClient.state.collectAsStateWithLifecycle()
+    val localVision by LocalVisionObjectDetector.state.collectAsStateWithLifecycle()
+    val forwardCamera = isForwardCameraPosition(cameraState.selectedPosition)
     val road = osmRoad.road
     val parked = launcherState.speedKmh < VEHICLE_3D_DRIVING_KMH
     val focus3d = when (focus) {
@@ -100,17 +112,55 @@ internal fun Vehicle3dSceneFeeder(
         roadOneway = road?.oneway ?: true,
         roadCenterLine = road?.centerLineStyle ?: RoadLineStyle.SOLID,
         roadLaneLines = road?.laneLineStyles.orEmpty(),
+        roadObjects = if (forwardCamera && LocalVisionPipeline.objectsEnabled) {
+            vehicle3dRoadObjects(localVision.trackedObjects)
+        } else {
+            emptyList()
+        },
     )
     val visible = LocalDashboardVisible.current
     // Con el panel oculto no se renderiza; al mostrarlo se envia el estado actual.
     LaunchedEffect(input, visible) { if (visible) Vehicle3dOffscreenEngine.update(input) }
 }
 
+/**
+ * Places confirmed tracks on the 3D road. Traffic lights and signs keep their fixed indicators.
+ * Distance comes from where the box touches the ground (flat-road pinhole guess, visual only).
+ */
+internal fun vehicle3dRoadObjects(tracks: List<TrackedRoadObject>): List<Vehicle3dRoadObject> =
+    tracks.mapNotNull { track ->
+        val kind = when (track.kind) {
+            RoadObjectKind.CAR -> Vehicle3dRoadObjectKind.CAR
+            RoadObjectKind.BUS, RoadObjectKind.TRUCK -> Vehicle3dRoadObjectKind.LARGE_VEHICLE
+            RoadObjectKind.BICYCLE, RoadObjectKind.MOTORCYCLE -> Vehicle3dRoadObjectKind.TWO_WHEELER
+            RoadObjectKind.PERSON -> Vehicle3dRoadObjectKind.PERSON
+            RoadObjectKind.TRAFFIC_LIGHT, RoadObjectKind.STOP_SIGN -> return@mapNotNull null
+        }
+        val projection = projectTrackedRoadObject(track)
+        val belowHorizon = (projection.proximity * ROAD_GROUND_SPAN).coerceAtLeast(0.001f)
+        Vehicle3dRoadObject(
+            id = track.id,
+            kind = kind,
+            lateralLanes = projection.lateral,
+            aheadMeters = (CAMERA_GROUND_FACTOR / belowHorizon - CAMERA_TO_BUMPER_METERS)
+                .coerceIn(MIN_OBJECT_GAP_METERS, MAX_OBJECT_AHEAD_METERS),
+            egoLane = track.laneRelation == RoadLaneRelation.EGO,
+        )
+    }
+        .sortedBy { it.aheadMeters }
+        .take(MAX_3D_ROAD_OBJECTS)
+
+/** Image fraction between the horizon (0.40) and the nearest ground row (0.96) of the projection. */
+private const val ROAD_GROUND_SPAN = 0.56f
+/** Camera height times focal length (image heights) of a wide dashcam, in metres. */
+private const val CAMERA_GROUND_FACTOR = 0.75f
+private const val CAMERA_TO_BUMPER_METERS = 1.6f
+private const val MIN_OBJECT_GAP_METERS = 2.5f
+private const val MAX_OBJECT_AHEAD_METERS = 44f
+private const val MAX_3D_ROAD_OBJECTS = 6
+
 /** Falso mientras el servicio mantiene el panel oculto tras una app a pantalla completa. */
 internal val LocalDashboardVisible = compositionLocalOf { true }
-
-/** Lane chosen by the road view's tracker, shared with the OpenGL road. */
-internal val vehicle3dActiveLaneFromRight = MutableStateFlow(0)
 
 internal fun vehicle3dSceneInput(
     state: LauncherState,

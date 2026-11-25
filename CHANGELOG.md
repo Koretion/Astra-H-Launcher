@@ -5,6 +5,32 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.8 — 2026-11-25
+
+Versión Android: `versionCode 69`, `versionName 0.5.8`.
+
+- El coche 3D muestra los vehículos, motos y peatones que detecta la cámara, sobre la carretera
+  y en su carril: rojos los de tu carril y azules los demás. Se mueven suavemente entre
+  detecciones y aparecen y desaparecen con un fundido. Antes solo los veía la escena 2D.
+- El coche 3D ya no copia cada fotograma desde la GPU: se dibuja en un búfer que la pantalla
+  muestra directamente. La copia costaba unos 49 ms por fotograma en la radio. Si el sistema no
+  lo admite, vuelve solo al método anterior; el informe indica cuál usa (`Frame output`).
+- Los intermitentes de la pantalla (flechas de la barra superior y coche 3D) siguen a los reales:
+  se sincronizan con la trama SW-CAN `0x260` que la centralita envía en cada destello, con 380 ms
+  encendidos y 300 ms apagados. Antes parpadeaban con un temporizador propio de 900 ms.
+- El indicador del freno de mano ya no parpadea con el coche parado. La caja CAN de la ROM envía
+  en este coche paquetes vacíos que lo apagaban; ahora, mientras el GMLAN-USB da el dato, esos
+  paquetes no pisan el freno de mano, los intermitentes ni las luces.
+- Nueva detección de cambio de carril: el intermitente abre la ventana y la confirma la forma del
+  giro de volante (hacia el lado indicado y contravolanteo) o la cámara (cruce de línea). OSM
+  limita el carril a los que tiene la vía y los giros en cruces se descartan. Funciona también con
+  el panel oculto. Cada intento queda en el informe como `LANE_CHANGE` para afinarlo.
+- Botón GRABAR en Log y diagnóstico: graba la pantalla completa sin sonido en
+  `Movies/AstraLauncher`, en H.265 si la radio lo admite (si no, H.264) a 24 fps. Se para desde
+  el mismo botón, que muestra el tiempo, o desde la notificación.
+- Buscador en Ajustes: escribe, por ejemplo, «log» y aparecen las pantallas que contienen esa
+  palabra; al tocar una se abre directamente. No distingue mayúsculas ni acentos.
+
 ## 0.5.7 — 2026-11-22
 
 Versión Android: `versionCode 68`, `versionName 0.5.7`.

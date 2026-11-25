@@ -5,6 +5,7 @@ import com.ts10.inspector.settings.DashboardPreferences
 import com.ts10.inspector.settings.DriverProfilePreferences
 import com.ts10.inspector.vehicle.SpeedWarningController
 import com.ts10.inspector.vehicle.can.Esp32CanClient
+import com.ts10.inspector.vehicle.can.Esp32CanState
 import com.ts10.inspector.vehicle.obd.Obd2Client
 import com.ts10.inspector.vehicle.obd.ObdConnectionState
 import com.ts10.inspector.vehicle.resolveVehicleSpeed
@@ -18,6 +19,13 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Resolves displayed speed and merges ESP32 body signals into the launcher state. */
+internal data class DirectCanBodyFreshness(
+    val turn: Boolean,
+    val exteriorLights: Boolean,
+    val highBeam: Boolean,
+    val handbrake: Boolean,
+)
+
 internal object VehicleStateFusion {
     @Volatile private var gpsSpeedKmh = 0
     @Volatile private var canSpeedSupported = false
@@ -34,6 +42,26 @@ internal object VehicleStateFusion {
     fun onGpsSpeed(speedKmh: Int) {
         gpsSpeedKmh = speedKmh
         updateDisplayedSpeed()
+    }
+
+    /**
+     * Body signals the GMLAN-USB currently supplies. The QF CAN box must not overwrite them: on
+     * boxes without body support it sends empty packets (handbrake off, lights off), which made the
+     * dashboard flicker between both sources.
+     */
+    fun directCanBodyFreshness(
+        can: Esp32CanState = Esp32CanClient.state.value,
+        now: Long = SystemClock.elapsedRealtime(),
+    ): DirectCanBodyFreshness {
+        fun fresh(updatedAt: Long) = can.connected && now - updatedAt <= DIRECT_CAN_TIMEOUT_MS
+        val dynamics = fresh(can.hsBodyDynamicsUpdatedElapsedMs)
+        return DirectCanBodyFreshness(
+            turn = fresh(can.swTurnUpdatedElapsedMs) || dynamics,
+            exteriorLights = fresh(can.msLightingUpdatedElapsedMs),
+            highBeam = dynamics,
+            handbrake = (can.swHandbrake != null && fresh(can.swHandbrakeUpdatedElapsedMs)) ||
+                (can.hsHandbrake != null && fresh(can.hsHandbrakeUpdatedElapsedMs)),
+        )
     }
 
     /** QF reports 0 km/h on CAN boxes without speed support, so zero only counts once seen moving. */

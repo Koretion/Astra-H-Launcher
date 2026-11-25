@@ -1023,4 +1023,17 @@
     <string name="tire_name_front_right">Front right</string>
     <string name="tire_name_rear_left">Rear left</string>
     <string name="tire_name_rear_right">Rear right</string>
+    <string name="diag_record">RECORD</string>
+    <string name="diag_record_stop">STOP %1$s</string>
+    <string name="diag_record_last">Last recording</string>
+    <string name="screen_record_title">Screen recording</string>
+    <string name="screen_record_channel">Screen recording</string>
+    <string name="screen_record_running">Recording the screen without sound. Stop it here or in Log and diagnostics.</string>
+    <string name="screen_record_stop_action">Stop</string>
+    <string name="screen_record_saved">Video saved in %1$s</string>
+    <string name="screen_record_failed">Could not record: %1$s</string>
+    <string name="screen_record_denied">Screen recording was not allowed</string>
+    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_search_results">%1$d results</string>
+    <string name="settings_search_empty">Nothing in the settings matches \"%1$s\"</string>
 </resources>

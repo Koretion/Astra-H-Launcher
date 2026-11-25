@@ -1022,4 +1022,17 @@
     <string name="tire_name_front_right">Avant droit</string>
     <string name="tire_name_rear_left">Arrière gauche</string>
     <string name="tire_name_rear_right">Arrière droit</string>
+    <string name="diag_record">FILMER</string>
+    <string name="diag_record_stop">ARRÊT %1$s</string>
+    <string name="diag_record_last">Dernier enregistrement</string>
+    <string name="screen_record_title">Enregistrement de l\'écran</string>
+    <string name="screen_record_channel">Enregistrement de l\'écran</string>
+    <string name="screen_record_running">Enregistrement de l\'écran sans son. Arrêtez-le ici ou dans Journal et diagnostic.</string>
+    <string name="screen_record_stop_action">Arrêter</string>
+    <string name="screen_record_saved">Vidéo enregistrée dans %1$s</string>
+    <string name="screen_record_failed">Enregistrement impossible : %1$s</string>
+    <string name="screen_record_denied">L\'enregistrement de l\'écran n\'a pas été autorisé</string>
+    <string name="settings_search_hint">Rechercher dans les réglages</string>
+    <string name="settings_search_results">%1$d résultats</string>
+    <string name="settings_search_empty">Aucun réglage ne correspond à « %1$s »</string>
 </resources>

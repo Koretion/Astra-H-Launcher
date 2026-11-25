@@ -106,6 +106,7 @@ internal fun StringBuilder.appendOffscreenOpengl3dSection(context: Context, stat
     field("Last minute fps", f(stats.fps))
     field("Frame interval avg", "${f(stats.intervalAvgMs)} ms")
     field("Render avg / p95 / max", "${f(stats.renderAvgMs)} / ${f(stats.renderP95Ms)} / ${f(stats.renderMaxMs)} ms")
+    field("Frame output", Vehicle3dOffscreenEngine.outputPath())
     field("Draw / readback / convert avg", "${f(stats.drawAvgMs)} / ${f(stats.readbackAvgMs)} / ${f(stats.convertAvgMs)} ms")
     field("Error", offscreen3d.error ?: "--")
     appendLine("Mode: read-only")

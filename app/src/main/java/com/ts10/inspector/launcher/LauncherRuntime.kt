@@ -181,6 +181,7 @@ object LauncherRuntime {
         com.ts10.inspector.vehicle.can.profile.VehicleProfileManager.start(context.applicationContext)
         Esp32CanClient.start(context.applicationContext)
         VehicleStateFusion.observeEsp32VehicleSignals()
+        com.ts10.inspector.vision.LaneChangeEstimator.start(LauncherStore.scope)
         QfDataShareBridge.start(context.applicationContext, LauncherStore.scope)
         AndroidRootChecker.start(context.applicationContext, LauncherStore.scope)
         Obd2Client.start(context.applicationContext)

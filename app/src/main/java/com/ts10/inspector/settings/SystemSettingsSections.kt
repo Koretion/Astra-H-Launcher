@@ -41,6 +41,13 @@ import com.ts10.inspector.AppVersion
 import com.ts10.inspector.dashboard.VehicleSceneMode
 import com.ts10.inspector.diagnostics.AndroidRootChecker
 import com.ts10.inspector.diagnostics.FrameworkExportActivity
+import com.ts10.inspector.diagnostics.ScreenRecording
+import android.os.SystemClock
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
+import java.util.Locale
 import com.ts10.inspector.diagnostics.QfLogExportActivity
 import com.ts10.inspector.environment.OsmRoadContextProvider
 import com.ts10.inspector.launcher.HybridOverlayService
@@ -538,12 +545,23 @@ internal fun DiagnosticsDetail(layout: LauncherLayout, width: Float, height: Flo
     val state by LauncherRuntime.diagnostics.collectAsStateWithLifecycle()
     val esp32 by Esp32CanClient.state.collectAsStateWithLifecycle()
     val frameworkExport by FrameworkExportActivity.progress.collectAsStateWithLifecycle()
+    val screenRecording by ScreenRecording.state.collectAsStateWithLifecycle()
+    // Ticks once a second only while recording, for the elapsed time on the button.
+    val recordingSeconds by produceState(0L, screenRecording.recording, screenRecording.startedElapsedMs) {
+        while (screenRecording.recording) {
+            value = (SystemClock.elapsedRealtime() - screenRecording.startedElapsedMs) / 1_000L
+            delay(1_000L)
+        }
+        value = 0L
+    }
     val recentLog = state.log.takeLast(120).asReversed()
     LazyColumn(modifier = Modifier.size(layout.dp(width), layout.dp(height))) {
         item {
-            Row(
+            @OptIn(ExperimentalLayoutApi::class)
+            FlowRow(
                 modifier = Modifier.padding(bottom = layout.dp(8)),
-                horizontalArrangement = Arrangement.spacedBy(layout.dp(16)),
+                horizontalArrangement = Arrangement.spacedBy(layout.dp(12)),
+                verticalArrangement = Arrangement.spacedBy(layout.dp(8)),
             ) {
                 DiagnosticAction(
                     if (state.captureActive) stringResource(R.string.diag_stop) else stringResource(R.string.diag_start),
@@ -559,6 +577,18 @@ internal fun DiagnosticsDetail(layout: LauncherLayout, width: Float, height: Flo
                     if (frameworkExport.running) Color(0xFFE0A020) else Color(0xFF3579B8),
                     layout,
                 ) { FrameworkExportActivity.launch(context) }
+                DiagnosticAction(
+                    if (screenRecording.recording) {
+                        stringResource(
+                            R.string.diag_record_stop,
+                            String.format(Locale.US, "%02d:%02d", recordingSeconds / 60, recordingSeconds % 60),
+                        )
+                    } else {
+                        stringResource(R.string.diag_record)
+                    },
+                    if (screenRecording.recording) Color(0xFFB53B32) else Color(0xFF3579B8),
+                    layout,
+                ) { ScreenRecording.toggle(context) }
             }
         }
         item { SettingsCard(layout, width) {
@@ -585,6 +615,9 @@ internal fun DiagnosticsDetail(layout: LauncherLayout, width: Float, height: Flo
                 )
             }
             MetricRow(stringResource(R.string.diag_last_frame), esp32.lastFrame, "USB", layout)
+            screenRecording.lastVideo?.let { video ->
+                MetricRow(stringResource(R.string.diag_record_last), video.substringAfterLast('/'), video.substringBeforeLast('/'), layout)
+            }
         } }
         item {
             Text(

@@ -38,7 +38,9 @@ import com.ts10.inspector.launcher.LauncherRuntime
 import com.ts10.inspector.ui.DashboardAssetIcon
 import com.ts10.inspector.ui.LauncherLayout
 import com.ts10.inspector.ui.LocalDashboardColors
+import com.ts10.inspector.vehicle.TurnSignalFlash
 import com.ts10.inspector.vehicle.VehicleSignalHub
+import kotlinx.coroutines.delay
 import com.ts10.inspector.vehicle.fuel.FuelRangeEstimator
 
 @Composable
@@ -67,24 +69,36 @@ internal fun VehicleTopIndicators(
     val leftActive = vehicle.leftBlinker || now < leftPulseUntil
     val rightActive = vehicle.rightBlinker || now < rightPulseUntil
     val criticalFuel = fuel.lowRange && fuel.criticalRange && fuel.rangeKm != null
-    // La transicion infinita recompone la barra en cada frame: solo existe mientras algo parpadea.
-    // Mientras existe, esas recomposiciones tambien hacen caducar los pulsos de leftPulseUntil.
-    val indicatorPhase = if (leftActive || rightActive || criticalFuel) {
-        val indicatorTransition = rememberInfiniteTransition(label = "top bar indicators")
-        indicatorTransition.animateFloat(
+    // Las flechas siguen la fase del intermitente real (TurnSignalFlash) y no un temporizador
+    // propio: se despierta justo en cada cambio y se resincroniza con cada trama recibida. Cada
+    // cambio recompone la barra, y eso tambien hace caducar los pulsos de leftPulseUntil.
+    val indicatorsActive = leftActive || rightActive
+    val flashEdges by TurnSignalFlash.edges.collectAsStateWithLifecycle()
+    var indicatorLampOn by remember { mutableStateOf(false) }
+    LaunchedEffect(indicatorsActive, flashEdges) {
+        while (indicatorsActive) {
+            indicatorLampOn = TurnSignalFlash.lampOn(active = true)
+            delay(TurnSignalFlash.msUntilChange())
+        }
+        indicatorLampOn = false
+    }
+    // La transicion infinita recompone la barra en cada frame: solo existe mientras el aviso parpadea.
+    val fuelPhase = if (criticalFuel) {
+        val fuelTransition = rememberInfiniteTransition(label = "top bar fuel warning")
+        fuelTransition.animateFloat(
             initialValue = 1f,
             targetValue = 0f,
             animationSpec = infiniteRepeatable(
                 animation = tween(450, easing = LinearEasing),
                 repeatMode = RepeatMode.Reverse,
             ),
-            label = "top bar indicator blink",
+            label = "top bar fuel warning blink",
         ).value
     } else {
         1f
     }
-    val leftIlluminated = leftActive && indicatorPhase >= 0.5f
-    val rightIlluminated = rightActive && indicatorPhase >= 0.5f
+    val leftIlluminated = leftActive && indicatorLampOn
+    val rightIlluminated = rightActive && indicatorLampOn
 
     Box(modifier = modifier) {
         TopBarTurnArrow(
@@ -147,7 +161,7 @@ internal fun VehicleTopIndicators(
         }
         val rangeKm = fuel.rangeKm
         if (fuel.lowRange && rangeKm != null) {
-            val criticalAlpha = if (fuel.criticalRange) indicatorPhase.coerceAtLeast(0.12f) else 1f
+            val criticalAlpha = if (fuel.criticalRange) fuelPhase.coerceAtLeast(0.12f) else 1f
             DashboardAssetIcon(
                 drawable = R.drawable.icon_fuel,
                 contentDescription = stringResource(R.string.top_low_range, rangeKm),
