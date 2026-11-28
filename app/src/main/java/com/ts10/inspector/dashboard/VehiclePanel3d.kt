@@ -30,6 +30,7 @@ import com.ts10.inspector.vehicle.VehicleSignalHub
 import com.ts10.inspector.vehicle.VehicleSignals
 import com.ts10.inspector.vehicle.can.SwWindowAction
 import com.ts10.inspector.vehicle3d.ParkedViewState
+import com.ts10.inspector.vehicle3d.arrangeRoadObjects
 import com.ts10.inspector.vehicle3d.Vehicle3dFocus
 import com.ts10.inspector.vehicle3d.Vehicle3dOffscreenEngine
 import com.ts10.inspector.vehicle3d.Vehicle3dRoadObject
@@ -116,7 +117,7 @@ internal fun Vehicle3dSceneFeeder(
         roadCenterLine = road?.centerLineStyle ?: RoadLineStyle.SOLID,
         roadLaneLines = road?.laneLineStyles.orEmpty(),
         roadObjects = if (forwardCamera && LocalVisionPipeline.objectsEnabled) {
-            vehicle3dRoadObjects(localVision.trackedObjects)
+            arrangeRoadObjects(vehicle3dRoadObjects(localVision.trackedObjects), road?.lanesInTravelDirection ?: 0, activeLane)
         } else {
             emptyList()
         },

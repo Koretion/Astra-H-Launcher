@@ -45,6 +45,10 @@ data class DashboardSettings(
     val vehiclePaintCustomArgb: Int = 0xFF2E7D5B.toInt(),
     /** Color del suelo del showroom 3D; null es el suelo de estudio por defecto. */
     val floorColorArgb: Int? = null,
+    /** Guardar recortes de señales y semáforos para entrenar el reconocimiento; no hace falta para funcionar. */
+    val visionEvidenceEnabled: Boolean = false,
+    /** Geometría de prueba para la ventana de Waze en el panel derecho. */
+    val wazeGeometry: WazePanelGeometry = WazePanelGeometry.CURRENT,
 ) {
     fun vehiclePaintArgb(themeArgb: Int): Int = when (vehiclePaint) {
         Vehicle3dPaint.CUSTOM -> vehiclePaintCustomArgb
@@ -61,6 +65,22 @@ val FLOOR_PRESET_COLORS = listOf(
 enum class SpeedUnit(val label: String) { KMH("km/h"), MPH("mph") }
 
 enum class TemperatureUnit(val label: String) { CELSIUS("°C"), FAHRENHEIT("°F") }
+
+/**
+ * Variantes de prueba de la ventana de Waze. El manifiesto de Waze no fija proporción (es
+ * redimensionable y sin min/maxAspectRatio): el recorte inferior viene de la política de ventanas
+ * de QF y de los 43 px de barra de navegación oculta que Waze sigue reservando.
+ */
+enum class WazePanelGeometry(@StringRes val label: Int) {
+    /** 605 px de alto desplazados hacia abajo (la geometría usada hasta ahora). */
+    CURRENT(R.string.waze_geometry_current),
+    /** Todo el alto del panel, como las demás apps. */
+    FULL_HEIGHT(R.string.waze_geometry_full),
+    /** Como la actual, pero un 5 % más ancha hacia la izquierda. */
+    WIDER(R.string.waze_geometry_wider),
+    /** Todo el alto y un 5 % más ancha. */
+    WIDER_FULL_HEIGHT(R.string.waze_geometry_wider_full),
+}
 
 /** AUTO sigue el ajuste 12/24 h de Android. */
 enum class TimeFormatMode { AUTO, H12, H24 }
@@ -243,6 +263,10 @@ class DashboardPreferences private constructor(private val context: Context) {
     fun setVehiclePaintCustom(argb: Int) {
         preferences.edit().putInt(KEY_VEHICLE_PAINT_CUSTOM, argb).putString(KEY_VEHICLE_PAINT, Vehicle3dPaint.CUSTOM.name).apply()
     }
+    fun setWazeGeometry(geometry: WazePanelGeometry) = edit(KEY_WAZE_GEOMETRY, geometry.name)
+    fun setVisionEvidenceEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_VISION_EVIDENCE, enabled).apply()
+    }
     fun setFloorColor(argb: Int?) {
         preferences.edit().apply { if (argb == null) remove(KEY_FLOOR_COLOR) else putInt(KEY_FLOOR_COLOR, argb) }.apply()
     }
@@ -322,6 +346,8 @@ class DashboardPreferences private constructor(private val context: Context) {
         private const val KEY_DATE_FORMAT = "date_format"
         private const val KEY_VEHICLE_PAINT_CUSTOM = "vehicle_3d_paint_custom"
         private const val KEY_FLOOR_COLOR = "vehicle_3d_floor_color"
+        private const val KEY_VISION_EVIDENCE = "vision_evidence_enabled"
+        private const val KEY_WAZE_GEOMETRY = "waze_panel_geometry"
         private const val SEPARATOR = "|"
 
         @Volatile
@@ -418,6 +444,8 @@ class DashboardPreferences private constructor(private val context: Context) {
             dateFormat = preferences.enumValue(KEY_DATE_FORMAT, DateFormatMode.AUTO),
             vehiclePaintCustomArgb = preferences.getInt(KEY_VEHICLE_PAINT_CUSTOM, 0xFF2E7D5B.toInt()),
             floorColorArgb = if (preferences.contains(KEY_FLOOR_COLOR)) preferences.getInt(KEY_FLOOR_COLOR, 0) else null,
+            visionEvidenceEnabled = preferences.getBoolean(KEY_VISION_EVIDENCE, false),
+            wazeGeometry = preferences.enumValue(KEY_WAZE_GEOMETRY, WazePanelGeometry.CURRENT),
         )
 
         private inline fun <reified T : Enum<T>> SharedPreferences.enumValue(key: String, default: T): T =

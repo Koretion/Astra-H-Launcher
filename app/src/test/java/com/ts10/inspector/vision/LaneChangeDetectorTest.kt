@@ -85,10 +85,22 @@ class LaneChangeDetectorTest {
         drive(2_000, steering = 10.5f, left = true, right = true)
         assertEquals(0, drive(2_000, steering = 1.5f, left = true, right = true))
 
-        drive(3_000, steering = 4.5f, lanes = 1)
+        // Una vía de un carril sostenida (más que la espera de caída de carriles).
+        drive(11_000, steering = 4.5f, lanes = 1)
         drive(1_000, steering = 10.5f, left = true, lanes = 1)
         assertEquals(0, drive(1_500, steering = 1.5f, left = true, lanes = 1))
         assertTrue(logs.last().contains("reject:osm-single-lane"))
+    }
+
+    @Test
+    fun `brief OSM drop to one lane keeps the lane position`() {
+        drive(3_000, steering = 4.5f, lanes = 3)
+        drive(800, steering = 4.5f, left = true, lanes = 3)
+        drive(1_000, steering = 10.5f, left = true, lanes = 3)
+        assertEquals(1, drive(2_000, steering = 1.5f, left = true, lanes = 3))
+        // OSM salta unos segundos a un ramal de un carril y vuelve.
+        assertEquals(1, drive(5_000, steering = 4.5f, lanes = 1))
+        assertEquals(1, drive(2_000, steering = 4.5f, lanes = 3))
     }
 
     private fun lane(offset: Float) = RoadLaneGeometry(

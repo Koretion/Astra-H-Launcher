@@ -129,6 +129,7 @@ internal object OsmRoadContextProvider {
     private var lastMatchElapsedMs = 0L
     private var nextOverpassUrlIndex = 0
     private var cacheRestoreStarted = false
+    private val stabilizer = OsmRoadStabilizer()
 
     private data class RoadEnvelope(
         val ways: List<OsmRoadWay>,
@@ -182,6 +183,7 @@ internal object OsmRoadContextProvider {
     @Synchronized
     fun clear() {
         latestRoadLocation = null
+        stabilizer.reset()
         lastMatchedWayId = null
         lastMatchElapsedMs = 0L
         publish(null, UiText.of(R.string.osm_stopped))
@@ -190,6 +192,7 @@ internal object OsmRoadContextProvider {
     @Synchronized
     fun onLocationUnavailable() {
         latestRoadLocation = null
+        stabilizer.reset()
         lastMatchedWayId = null
         lastMatchElapsedMs = 0L
         publish(null, UiText.of(R.string.osm_no_gps))
@@ -243,7 +246,7 @@ internal object OsmRoadContextProvider {
     private fun publishMatch(road: OsmRoadContext?, nowElapsedMs: Long) {
         if (road != null) {
             lastMatchElapsedMs = nowElapsedMs
-            publish(road, UiText.of(R.string.osm_road_found))
+            publish(stabilizer.stabilize(road, nowElapsedMs), UiText.of(R.string.osm_road_found))
             return
         }
         // A single imprecise GPS fix or a junction must not make the sign and lane data flicker.
@@ -252,6 +255,7 @@ internal object OsmRoadContextProvider {
         if (mutableState.value.road != null && nowElapsedMs - lastMatchElapsedMs <= TRANSIENT_MISS_HOLD_MS) {
             mutableState.value = mutableState.value.copy(status = UiText.of(R.string.osm_keeping_road))
         } else {
+            stabilizer.reset()
             publish(null, UiText.of(R.string.osm_searching))
         }
     }
@@ -547,6 +551,22 @@ internal fun matchOsmRoad(
         return parseMaxSpeedKmh(way.tags["maxspeed:$direction"] ?: way.tags["maxspeed"])
     }
 
+    val previousWay = previousWayId?.let { id -> ways.firstOrNull { it.id == id } }
+
+    /** La vía anterior, otro tramo de la misma carretera o uno que empieza donde acaba aquella. */
+    fun continuityBonus(way: OsmRoadWay): Double {
+        if (previousWay == null) return 0.0
+        if (way.id == previousWay.id) return SAME_WAY_BONUS
+        val sameRoad = samePhysicalRoad(previousWay.tags, way.tags)
+        val connected = waysTouch(previousWay.geometry, way.geometry)
+        return when {
+            sameRoad && connected -> CONNECTED_SAME_ROAD_BONUS
+            sameRoad -> SAME_ROAD_BONUS
+            connected -> CONNECTED_BONUS
+            else -> 0.0
+        }
+    }
+
     val candidates = ways.mapNotNull { way ->
         val nearest = nearestSegment(way.geometry, latitude, longitude) ?: return@mapNotNull null
         if (nearest.distanceMeters > maxDistanceMeters) return@mapNotNull null
@@ -565,13 +585,12 @@ internal fun matchOsmRoad(
         }
         val headingPenalty = travelDifference?.let { min(it, 90.0) * 0.22 } ?: 0.0
         val classPenalty = highwayMatchPenalty(way.tags["highway"])
-        val continuityBonus = if (way.id == previousWayId) 7.0 else 0.0
         Candidate(
             way,
             nearest.distanceMeters,
             forward,
             travelDifference,
-            nearest.distanceMeters + headingPenalty + classPenalty - continuityBonus,
+            nearest.distanceMeters + headingPenalty + classPenalty - continuityBonus(way),
             nearest.segmentIndex,
         )
     }
@@ -590,7 +609,11 @@ internal fun matchOsmRoad(
         .distinct()
         .singleOrNull()
     val effectiveSpeed = selectedSpeed ?: inheritedSpeed
-    val ambiguous = effectiveSpeed != null && candidates.any { other ->
+    // Siguiendo la misma carretera no se duda: un ramal o una vía paralela cercana con otro límite
+    // apagaba la señal en cada enlace aunque el coche no hubiera salido de la vía.
+    val continuing = previousWay != null &&
+        (selected.way.id == previousWay.id || samePhysicalRoad(previousWay.tags, selected.way.tags))
+    val ambiguous = !continuing && effectiveSpeed != null && candidates.any { other ->
         val otherSpeed = other.directionalMaxSpeedKmh()
         other.way.id != selected.way.id && abs(other.score - selected.score) < 8.0 &&
             otherSpeed != null && !samePhysicalRoad(selected.way.tags, other.way.tags) &&
@@ -618,6 +641,92 @@ private fun samePhysicalRoad(first: Map<String, String>, second: Map<String, Str
     val secondName = second["name"]?.trim()?.takeIf(String::isNotEmpty)
     return firstName != null && secondName != null &&
         firstName.equals(secondName, ignoreCase = true) && first["highway"] == second["highway"]
+}
+
+private const val SAME_WAY_BONUS = 14.0
+private const val CONNECTED_SAME_ROAD_BONUS = 12.0
+private const val SAME_ROAD_BONUS = 8.0
+private const val CONNECTED_BONUS = 5.0
+private const val TOUCH_METERS = 6.0
+
+/** True si algún extremo de una vía está a menos de [TOUCH_METERS] de un extremo de la otra. */
+private fun waysTouch(first: List<OsmCoordinate>, second: List<OsmCoordinate>): Boolean {
+    if (first.isEmpty() || second.isEmpty()) return false
+    val ends = listOf(first.first(), first.last())
+    val others = listOf(second.first(), second.last())
+    return ends.any { a -> others.any { b -> approximateMeters(a, b) <= TOUCH_METERS } }
+}
+
+private fun approximateMeters(a: OsmCoordinate, b: OsmCoordinate): Double {
+    val latitudeScale = 111_320.0
+    val longitudeScale = latitudeScale * cos(Math.toRadians((a.latitude + b.latitude) / 2.0))
+    return hypot((a.longitude - b.longitude) * longitudeScale, (a.latitude - b.latitude) * latitudeScale)
+}
+
+/**
+ * Suaviza lo que se muestra de OSM. En la TS10 la señal y los carriles parpadeaban porque:
+ * - en enlaces y vías paralelas el emparejamiento saltaba unos segundos a un ramal;
+ * - un tramo nuevo de la misma carretera llegaba sin `maxspeed` o con los carriles estimados.
+ * Un cambio a otra carretera solo se acepta si se mantiene [SWITCH_CONFIRM_MS]; el límite se
+ * conserva [SPEED_HOLD_MS] mientras se sigue la misma vía (o una rotonda) sin límite propio, y los
+ * carriles reales del tramo anterior se mantienen si el nuevo solo los estima.
+ */
+internal class OsmRoadStabilizer {
+    private var shown: OsmRoadContext? = null
+    private var speedKmh: Int? = null
+    private var speedAtMs = 0L
+    private var pendingWayId: Long? = null
+    private var pendingSinceMs = 0L
+
+    fun reset() {
+        shown = null
+        speedKmh = null
+        pendingWayId = null
+    }
+
+    fun stabilize(raw: OsmRoadContext, nowMs: Long): OsmRoadContext {
+        val previous = shown
+        if (previous != null && raw.wayId != previous.wayId && !sameCarriageway(previous, raw)) {
+            if (pendingWayId != raw.wayId) {
+                pendingWayId = raw.wayId
+                pendingSinceMs = nowMs
+            }
+            if (nowMs - pendingSinceMs < SWITCH_CONFIRM_MS) return previous
+        }
+        pendingWayId = null
+        val keepLanes = previous != null && raw.wayId != previous.wayId && raw.lanesEstimated &&
+            !previous.lanesEstimated && samePhysicalRoad(previous.tags, raw.tags)
+        val speed = when {
+            raw.maxSpeedKmh != null -> raw.maxSpeedKmh.also {
+                speedKmh = it
+                speedAtMs = nowMs
+            }
+            previous != null && nowMs - speedAtMs <= SPEED_HOLD_MS && holdsSpeed(previous, raw) -> speedKmh
+            else -> null
+        }
+        val result = raw.copy(
+            maxSpeedKmh = speed,
+            lanesInTravelDirection = if (keepLanes) previous!!.lanesInTravelDirection else raw.lanesInTravelDirection,
+            lanesEstimated = if (keepLanes) false else raw.lanesEstimated,
+            laneLineStyles = if (keepLanes) previous!!.laneLineStyles else raw.laneLineStyles,
+        )
+        shown = result
+        return result
+    }
+
+    private fun sameCarriageway(previous: OsmRoadContext, next: OsmRoadContext): Boolean =
+        samePhysicalRoad(previous.tags, next.tags) || next.isRoundabout || previous.isRoundabout ||
+            (previous.highway == next.highway && !next.highway.endsWith("_link"))
+
+    private fun holdsSpeed(previous: OsmRoadContext, next: OsmRoadContext): Boolean =
+        next.wayId == previous.wayId || samePhysicalRoad(previous.tags, next.tags) || next.isRoundabout ||
+            (previous.highway == next.highway && next.highway in MAIN_ROADS)
+
+    private companion object {
+        const val SWITCH_CONFIRM_MS = 3_000L
+        const val SPEED_HOLD_MS = 60_000L
+        val MAIN_ROADS = setOf("motorway", "trunk", "primary")
+    }
 }
 
 internal fun isUsableRoadFix(accuracyMeters: Float?, ageMs: Long): Boolean =

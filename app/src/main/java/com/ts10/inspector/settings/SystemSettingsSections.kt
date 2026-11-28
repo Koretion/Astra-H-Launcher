@@ -532,6 +532,38 @@ internal fun AdvancedDetail(
                 layout,
                 preferences::setLocalVisionObjectsEnabled,
             )
+            ToggleRow(
+                stringResource(R.string.adv_vision_evidence),
+                stringResource(R.string.adv_vision_evidence_hint),
+                settings.visionEvidenceEnabled,
+                layout,
+                preferences::setVisionEvidenceEnabled,
+            )
+            var evidenceDeleted by remember { mutableStateOf<Int?>(null) }
+            ActionRow(
+                stringResource(R.string.adv_vision_evidence_delete),
+                evidenceDeleted?.let { stringResource(R.string.adv_vision_evidence_deleted, it) }
+                    ?: stringResource(R.string.adv_vision_evidence_delete_hint),
+                layout,
+                enabled = true,
+            ) {
+                com.ts10.inspector.vision.VisionEvidenceRecorder.deleteAll(context) { evidenceDeleted = it }
+            }
+        } }
+        item { SettingsCard(layout, width) {
+            val geometryLabels = WazePanelGeometry.entries.associateWith { stringResource(it.label) }
+            OptionChoices(
+                stringResource(R.string.waze_geometry),
+                WazePanelGeometry.entries,
+                settings.wazeGeometry,
+                { geometryLabels.getValue(it) },
+                { geometry ->
+                    preferences.setWazeGeometry(geometry)
+                    com.ts10.inspector.panel.PanelApplicationSession.applyWazeGeometryNow(context)
+                },
+                layout,
+            )
+            SectionHint(stringResource(R.string.waze_geometry_hint), layout)
         } }
         item { SectionHint(stringResource(R.string.adv_swa_blocked), layout) }
         item { SettingsCard(layout, width) {

@@ -540,6 +540,8 @@ internal fun DrawScope.drawOsmLaneLayout(
     roadCurve: Float,
     speedKmh: Int,
     motionProgress: Float,
+    /** Carril animado (fraccionario) durante un cambio de carril; por defecto el activo. */
+    animatedLaneFromRight: Float = activeLaneFromRight.toFloat(),
 ) {
     val laneCount = road?.lanesInTravelDirection?.coerceIn(1, 6) ?: return
     val lineColor = if (darkTheme) Color.White.copy(alpha = 0.66f) else Color(0xFF4E5964).copy(alpha = 0.62f)
@@ -555,7 +557,7 @@ internal fun DrawScope.drawOsmLaneLayout(
         val curvedCenter = roadCenter +
             roadCurveOffsetFraction(roadCurve, perspective) * size.width
         // The car remains fixed; moving to a lane on the left reveals the lanes to its right.
-        val right = curvedCenter + (laneIndex + 0.5f) * width
+        val right = curvedCenter + (animatedLaneFromRight.coerceIn(0f, laneCount - 1f) + 0.5f) * width
         return right - (laneCount - boundary) * width
     }
 

@@ -106,6 +106,7 @@
     <string name="profile_active">Perfil activo</string>
     <string name="profile_applies_hint">Se aplican tema, idioma, color del coche y zoom. El teléfono asociado queda identificado por su dirección Bluetooth; la reconexión forzada depende del sistema QF.</string>
     <string name="road_steering_angle">Ángulo del volante</string>
+    <string name="road_roundabout">Rotonda</string>
     <string name="action_phone">Teléfono</string>
     <string name="action_voice_assistant">Asistente de voz</string>
     <string name="action_maps">Mapas</string>
@@ -614,6 +615,7 @@
     <string name="upd_installed">Instalada</string>
     <string name="upd_install_cancelled">Instalación cancelada</string>
     <string name="upd_install_failed">Instalación fallida: %1$s</string>
+    <string name="upd_install_no_response">Android no respondió a la instalación; vuelve a pulsar instalar</string>
     <string name="upd_check_first">Comprueba primero si hay versión nueva</string>
     <string name="upd_release_missing_apk">La release no incluye APK y .sha256</string>
     <string name="upd_downloading">Descargando %1$s</string>
@@ -840,6 +842,17 @@
     <string name="adv_usb_camera">Cámara USB</string>
     <string name="adv_objects">Objetos, personas y semáforos</string>
     <string name="adv_objects_hint">Experimental; desactivado dedica la visión a líneas y cambios de carril</string>
+    <string name="waze_geometry">Ventana de Waze (prueba)</string>
+    <string name="waze_geometry_hint">Se aplica al momento si Waze está en el panel, sin reiniciarlo. Más ancha quita un 5 % al panel izquierdo. Si alguna recorta los controles de abajo, vuelve a Actual.</string>
+    <string name="waze_geometry_current">Actual</string>
+    <string name="waze_geometry_full">Alto completo</string>
+    <string name="waze_geometry_wider">Más ancha</string>
+    <string name="waze_geometry_wider_full">Más ancha + alto completo</string>
+    <string name="adv_vision_evidence">Guardar imágenes de detecciones</string>
+    <string name="adv_vision_evidence_hint">Guarda recortes de señales y semáforos en Pictures/AstraVision para mejorar el reconocimiento. No hace falta para que el launcher funcione; las de más de 14 días se borran solas.</string>
+    <string name="adv_vision_evidence_delete">Borrar imágenes guardadas</string>
+    <string name="adv_vision_evidence_delete_hint">Elimina todas las imágenes de Pictures/AstraVision</string>
+    <string name="adv_vision_evidence_deleted">%1$d imágenes borradas</string>
     <string name="adv_swa_blocked">Experimental: la ROM de la radio bloquea ACTION_SWA sin root.</string>
     <string name="adv_emulate_wheel">Emular volante QF</string>
     <string name="adv_emulate_wheel_hint">Experimental: publica HS-CAN como ACTION_SWA; no transmite al coche</string>

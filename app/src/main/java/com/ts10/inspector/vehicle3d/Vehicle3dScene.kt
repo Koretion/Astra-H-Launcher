@@ -213,6 +213,11 @@ internal class Vehicle3dSceneAnimator {
     var travelMeters = 0f; private set
     var orbit = vehicle3dCameraTarget(Vehicle3dSceneInput()); private set
     var roadObjects: List<Vehicle3dAnimatedRoadObject> = emptyList(); private set
+    /** Carril activo animado (fraccionario) para que la carretera se deslice en un cambio de carril. */
+    var laneIndex = 0f; private set
+    private var laneFrom = 0f
+    private var laneTo = 0f
+    private var laneProgress = 1f
     private var initialized = false
 
     /** Advances the animation; returns true while another frame is needed. */
@@ -224,7 +229,19 @@ internal class Vehicle3dSceneAnimator {
             // Start with the wheel where it is, not swinging over from the centre.
             steeringWheelDegrees = input.steeringWheelDegrees.coerceIn(-540f, 540f)
             showroom = if (vehicle3dRoadMode(input)) 0f else 1f
+            laneIndex = activeLaneTarget(input)
+            laneTo = laneIndex
             initialized = true
+        }
+        val laneTarget = activeLaneTarget(input)
+        if (laneTarget != laneTo) {
+            laneFrom = laneIndex
+            laneTo = laneTarget
+            laneProgress = 0f
+        }
+        if (laneProgress < 1f) {
+            laneProgress = min(1f, laneProgress + dt / (LANE_CHANGE_SECONDS * max(1f, abs(laneTo - laneFrom))))
+            laneIndex = laneFrom + (laneTo - laneFrom) * ease(laneProgress)
         }
         val part = dt / PART_SECONDS
         val window = dt / WINDOW_SECONDS
@@ -267,7 +284,7 @@ internal class Vehicle3dSceneAnimator {
         val partsMoving = doorLeft != input.doorLeftOpen.toProgress() || doorRight != input.doorRightOpen.toProgress() ||
             hood != input.hoodOpen.toProgress() || tailgate != input.tailgateOpen.toProgress() ||
             windowLeft != input.windowLeftDown.toProgress() || windowRight != input.windowRightDown.toProgress() ||
-            showroom != showroomTarget
+            showroom != showroomTarget || laneProgress < 1f
         val objectsMoving = stepRoadObjects(input.roadObjects, dt)
         return cameraMoving || partsMoving || objectsMoving || abs(metresPerSecond) > 0.05f ||
             abs(wheelTarget - steeringWheelDegrees) > 0.5f || input.leftIndicator || input.rightIndicator
@@ -325,8 +342,13 @@ internal class Vehicle3dSceneAnimator {
 
     private fun Boolean.toProgress() = if (this) 1f else 0f
 
+    private fun activeLaneTarget(input: Vehicle3dSceneInput): Float =
+        input.activeLaneFromRight.coerceIn(0, max(1, input.roadLanes) - 1).toFloat()
+
     private companion object {
         const val PART_SECONDS = 0.9f
+        /** Lo que tarda la carretera en deslizarse un carril, como un cambio de carril real. */
+        const val LANE_CHANGE_SECONDS = 1.8f
         const val WINDOW_SECONDS = 3.5f
         const val CAMERA_SECONDS = 1.1f
         const val STEERING_RESPONSE = 8f

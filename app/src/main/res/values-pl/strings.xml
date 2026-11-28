@@ -106,6 +106,7 @@
     <string name="profile_active">Aktywny profil</string>
     <string name="profile_applies_hint">Stosowane są motyw, język, kolor samochodu i powiększenie. Powiązany telefon jest rozpoznawany po adresie Bluetooth; wymuszenie połączenia zależy od systemu QF.</string>
     <string name="road_steering_angle">Kąt skrętu kierownicy</string>
+    <string name="road_roundabout">Rondo</string>
     <string name="action_phone">Telefon</string>
     <string name="action_voice_assistant">Asystent głosowy</string>
     <string name="action_maps">Mapy</string>
@@ -614,6 +615,7 @@
     <string name="upd_installed">Zainstalowano</string>
     <string name="upd_install_cancelled">Instalacja anulowana</string>
     <string name="upd_install_failed">Instalacja nieudana: %1$s</string>
+    <string name="upd_install_no_response">Android nie odpowiedział na instalację; dotknij ponownie Zainstaluj</string>
     <string name="upd_check_first">Najpierw sprawdź, czy jest nowa wersja</string>
     <string name="upd_release_missing_apk">Wydanie nie zawiera APK i .sha256</string>
     <string name="upd_downloading">Pobieranie %1$s</string>
@@ -840,6 +842,17 @@
     <string name="adv_usb_camera">Kamera USB</string>
     <string name="adv_objects">Obiekty, osoby i sygnalizacja świetlna</string>
     <string name="adv_objects_hint">Eksperymentalne; po wyłączeniu widzenie skupia się na liniach pasów i zmianach pasa</string>
+    <string name="waze_geometry">Okno Waze (test)</string>
+    <string name="waze_geometry_hint">Działa od razu, jeśli Waze jest w panelu, bez ponownego uruchamiania. Szersze zabiera 5 % lewego panelu. Jeśli dolne przyciski są ucięte, wróć do Obecne.</string>
+    <string name="waze_geometry_current">Obecne</string>
+    <string name="waze_geometry_full">Pełna wysokość</string>
+    <string name="waze_geometry_wider">Szersze</string>
+    <string name="waze_geometry_wider_full">Szersze + pełna wysokość</string>
+    <string name="adv_vision_evidence">Zapisuj obrazy wykryć</string>
+    <string name="adv_vision_evidence_hint">Zapisuje wycinki znaków i sygnalizatorów w Pictures/AstraVision, aby ulepszyć rozpoznawanie. Niepotrzebne do działania launchera; obrazy starsze niż 14 dni są usuwane.</string>
+    <string name="adv_vision_evidence_delete">Usuń zapisane obrazy</string>
+    <string name="adv_vision_evidence_delete_hint">Usuwa wszystkie obrazy z Pictures/AstraVision</string>
+    <string name="adv_vision_evidence_deleted">Usunięto obrazy: %1$d</string>
     <string name="adv_swa_blocked">Eksperymentalne: ROM radia blokuje ACTION_SWA bez roota.</string>
     <string name="adv_emulate_wheel">Emuluj kierownicę QF</string>
     <string name="adv_emulate_wheel_hint">Eksperymentalne: publikuje HS-CAN jako ACTION_SWA; nigdy nie nadaje do samochodu</string>

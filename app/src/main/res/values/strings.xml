@@ -107,6 +107,7 @@
     <string name="profile_active">Active profile</string>
     <string name="profile_applies_hint">Theme, language, car colour and zoom are applied. The linked phone is identified by its Bluetooth address; forced reconnection depends on the QF system.</string>
     <string name="road_steering_angle">Steering angle</string>
+    <string name="road_roundabout">Roundabout</string>
     <string name="action_phone">Phone</string>
     <string name="action_voice_assistant">Voice assistant</string>
     <string name="action_maps">Maps</string>
@@ -615,6 +616,7 @@
     <string name="upd_installed">Installed</string>
     <string name="upd_install_cancelled">Install cancelled</string>
     <string name="upd_install_failed">Install failed: %1$s</string>
+    <string name="upd_install_no_response">Android did not respond to the install; tap install again</string>
     <string name="upd_check_first">Check for a new version first</string>
     <string name="upd_release_missing_apk">The release has no APK and .sha256</string>
     <string name="upd_downloading">Downloading %1$s</string>
@@ -841,6 +843,17 @@
     <string name="adv_usb_camera">USB camera</string>
     <string name="adv_objects">Objects, people and traffic lights</string>
     <string name="adv_objects_hint">Experimental; when off, vision is dedicated to lane lines and lane changes</string>
+    <string name="waze_geometry">Waze window (test)</string>
+    <string name="waze_geometry_hint">Applies at once if Waze is in the panel, without restarting it. Wider takes 5 % from the left panel. If one cuts off the bottom controls, go back to Current.</string>
+    <string name="waze_geometry_current">Current</string>
+    <string name="waze_geometry_full">Full height</string>
+    <string name="waze_geometry_wider">Wider</string>
+    <string name="waze_geometry_wider_full">Wider + full height</string>
+    <string name="adv_vision_evidence">Save detection images</string>
+    <string name="adv_vision_evidence_hint">Saves crops of signs and traffic lights in Pictures/AstraVision to improve recognition. Not needed for the launcher to work; images older than 14 days are deleted.</string>
+    <string name="adv_vision_evidence_delete">Delete saved images</string>
+    <string name="adv_vision_evidence_delete_hint">Removes every image in Pictures/AstraVision</string>
+    <string name="adv_vision_evidence_deleted">%1$d images deleted</string>
     <string name="adv_swa_blocked">Experimental: the head unit ROM blocks ACTION_SWA without root.</string>
     <string name="adv_emulate_wheel">Emulate QF steering wheel</string>
     <string name="adv_emulate_wheel_hint">Experimental: publishes HS-CAN as ACTION_SWA; never transmits to the car</string>

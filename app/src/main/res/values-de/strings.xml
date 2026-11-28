@@ -106,6 +106,7 @@
     <string name="profile_active">Aktives Profil</string>
     <string name="profile_applies_hint">Design, Sprache, Fahrzeugfarbe und Zoom werden übernommen. Das zugeordnete Telefon wird über seine Bluetooth-Adresse erkannt; das erzwungene Neuverbinden hängt vom QF-System ab.</string>
     <string name="road_steering_angle">Lenkwinkel</string>
+    <string name="road_roundabout">Kreisverkehr</string>
     <string name="action_phone">Telefon</string>
     <string name="action_voice_assistant">Sprachassistent</string>
     <string name="action_maps">Karten</string>
@@ -614,6 +615,7 @@
     <string name="upd_installed">Installiert</string>
     <string name="upd_install_cancelled">Installation abgebrochen</string>
     <string name="upd_install_failed">Installation fehlgeschlagen: %1$s</string>
+    <string name="upd_install_no_response">Android hat nicht auf die Installation reagiert; tippe erneut auf Installieren</string>
     <string name="upd_check_first">Zuerst nach einer neuen Version suchen</string>
     <string name="upd_release_missing_apk">Die Release enthält kein APK und keine .sha256</string>
     <string name="upd_downloading">Lade %1$s herunter</string>
@@ -840,6 +842,17 @@
     <string name="adv_usb_camera">USB-Kamera</string>
     <string name="adv_objects">Objekte, Personen und Ampeln</string>
     <string name="adv_objects_hint">Experimentell; aus = Bilderkennung nur für Fahrstreifen und Spurwechsel</string>
+    <string name="waze_geometry">Waze-Fenster (Test)</string>
+    <string name="waze_geometry_hint">Gilt sofort, wenn Waze im Bereich ist, ohne Neustart. Breiter nimmt dem linken Bereich 5 %. Werden untere Bedienelemente abgeschnitten, zurück zu Aktuell.</string>
+    <string name="waze_geometry_current">Aktuell</string>
+    <string name="waze_geometry_full">Volle Höhe</string>
+    <string name="waze_geometry_wider">Breiter</string>
+    <string name="waze_geometry_wider_full">Breiter + volle Höhe</string>
+    <string name="adv_vision_evidence">Erkennungsbilder speichern</string>
+    <string name="adv_vision_evidence_hint">Speichert Ausschnitte von Schildern und Ampeln in Pictures/AstraVision, um die Erkennung zu verbessern. Für den Launcher nicht nötig; Bilder älter als 14 Tage werden gelöscht.</string>
+    <string name="adv_vision_evidence_delete">Gespeicherte Bilder löschen</string>
+    <string name="adv_vision_evidence_delete_hint">Entfernt alle Bilder in Pictures/AstraVision</string>
+    <string name="adv_vision_evidence_deleted">%1$d Bilder gelöscht</string>
     <string name="adv_swa_blocked">Experimentell: Die Radio-ROM blockiert ACTION_SWA ohne Root.</string>
     <string name="adv_emulate_wheel">QF-Lenkrad emulieren</string>
     <string name="adv_emulate_wheel_hint">Experimentell: veröffentlicht HS-CAN als ACTION_SWA; sendet nichts ans Auto</string>

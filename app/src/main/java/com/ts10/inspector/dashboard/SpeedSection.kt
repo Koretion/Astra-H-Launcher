@@ -1,5 +1,13 @@
 package com.ts10.inspector.dashboard
 
+import kotlin.math.sin
+import kotlin.math.cos
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import com.ts10.inspector.environment.OsmRoadContextProvider
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,8 +64,57 @@ internal fun RuntimeSpeed(
     Speed(state, formats, layout, speedColor)
     val parkedView by ParkedViewState.parked.collectAsStateWithLifecycle()
     val parked3d = hideSpeedLimitWhenParked && parkedView
-    if (showSpeedLimit && speedLimit != null && !parked3d) {
-        SpeedLimitSign(formats.speedLimit(speedLimit), layout)
+    val showLimit = showSpeedLimit && speedLimit != null && !parked3d
+    if (showLimit) SpeedLimitSign(formats.speedLimit(speedLimit!!), layout)
+    // En una rotonda se muestra su señal: en el hueco del límite o a su derecha si lo hay.
+    val osmRoad by OsmRoadContextProvider.state.collectAsStateWithLifecycle()
+    if (showSpeedLimit && !parked3d && osmRoad.road?.isRoundabout == true) {
+        RoundaboutSign(layout, x = if (showLimit) 66f else 18f)
+    }
+}
+
+/** Señal azul de rotonda (sentido antihorario, circulación por la derecha). */
+@Composable
+private fun RoundaboutSign(layout: LauncherLayout, x: Float) {
+    val description = stringResource(R.string.road_roundabout)
+    Canvas(
+        Modifier.offset(layout.dp(x), layout.dp(169)).size(layout.dp(43))
+            .semantics { contentDescription = description },
+    ) {
+        val radius = size.minDimension / 2f
+        drawCircle(Color.White, radius)
+        drawCircle(Color(0xFF1F5FC7), radius * 0.9f)
+        val ring = radius * 0.5f
+        val stroke = radius * 0.17f
+        repeat(3) { index ->
+            // Cada flecha recorre 80° en sentido antihorario y termina en una punta.
+            val start = -90f + index * 120f + 20f
+            val sweep = -80f
+            drawArc(
+                color = Color.White,
+                startAngle = start,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = Offset(center.x - ring, center.y - ring),
+                size = Size(ring * 2f, ring * 2f),
+                style = Stroke(width = stroke),
+            )
+            val end = Math.toRadians((start + sweep).toDouble())
+            val tip = Offset(center.x + ring * cos(end).toFloat(), center.y + ring * sin(end).toFloat())
+            // Tangente en sentido antihorario en coordenadas de pantalla.
+            val tangent = Offset(sin(end).toFloat(), -cos(end).toFloat())
+            val normal = Offset(cos(end).toFloat(), sin(end).toFloat())
+            val head = stroke * 1.5f
+            drawPath(
+                Path().apply {
+                    moveTo(tip.x + tangent.x * head, tip.y + tangent.y * head)
+                    lineTo(tip.x + normal.x * head * 0.9f, tip.y + normal.y * head * 0.9f)
+                    lineTo(tip.x - normal.x * head * 0.9f, tip.y - normal.y * head * 0.9f)
+                    close()
+                },
+                Color.White,
+            )
+        }
     }
 }
 

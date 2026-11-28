@@ -15,6 +15,7 @@ import com.ts10.inspector.diagnostics.TelemetryLog
 import com.ts10.inspector.launcher.LauncherRuntime
 import com.ts10.inspector.settings.DashboardPreferences
 import com.ts10.inspector.settings.DashboardSettings
+import com.ts10.inspector.settings.WazePanelGeometry
 import com.ts10.inspector.ui.DesignGrid
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -102,6 +103,20 @@ internal fun wazeLaunchCoordinates(panelBounds: List<Int>): List<Int> {
     )
 }
 
+/** Rectángulo de Waze según la geometría de prueba elegida en Ajustes › Avanzado. */
+internal fun wazeGeometryCoordinates(panelBounds: List<Int>, geometry: WazePanelGeometry): List<Int> {
+    if (panelBounds.size != 4) return panelBounds
+    val extra = ((panelBounds[2] - panelBounds[0]) * WAZE_WIDER_FRACTION).roundToInt()
+    val base = when (geometry) {
+        WazePanelGeometry.CURRENT, WazePanelGeometry.WIDER -> wazeLaunchCoordinates(panelBounds)
+        WazePanelGeometry.FULL_HEIGHT, WazePanelGeometry.WIDER_FULL_HEIGHT -> panelBounds
+    }
+    val wider = geometry == WazePanelGeometry.WIDER || geometry == WazePanelGeometry.WIDER_FULL_HEIGHT
+    return if (wider) listOf(base[0] - extra, base[1], base[2], base[3]) else base
+}
+
+private const val WAZE_WIDER_FRACTION = 0.05f
+
 internal fun wazeLaunchBounds(panelBounds: Rect): Rect =
     wazeLaunchCoordinates(
         listOf(panelBounds.left, panelBounds.top, panelBounds.right, panelBounds.bottom),
@@ -113,6 +128,24 @@ internal object PanelApplicationSession {
     private var pendingRestore: Runnable? = null
     private var lastAutomaticRestorePackage: String? = null
     private var lastAutomaticRestoreElapsedMs = 0L
+
+    /**
+     * Aplica al momento la geometría de prueba de Waze: si Waze es la app del panel y su tarea
+     * sigue abierta, se reabre esa misma tarea con el rectángulo nuevo (no se reinicia ni pierde
+     * la ruta). Devuelve false si Waze no está en el panel; entonces se aplicará al abrirlo.
+     */
+    fun applyWazeGeometryNow(context: Context): Boolean {
+        if (preferences(context).getString(KEY_LAST_PACKAGE, null) != WAZE_PACKAGE) return false
+        if (runCatching { qfTaskId(context, WAZE_PACKAGE) }.getOrNull() == null) return false
+        TelemetryLog.event("EXTERNAL_APP", "waze geometry applied live")
+        return launchApplicationInContentArea(
+            context,
+            WAZE_PACKAGE,
+            activityClassName = preferences(context).getString(KEY_LAST_ACTIVITY, null),
+            forceBoundsRepair = true,
+            allowWazeTaskReset = false,
+        )
+    }
 
     fun remember(context: Context, packageName: String, activityClassName: String? = null) {
         preferences(context).edit()

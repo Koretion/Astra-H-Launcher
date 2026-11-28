@@ -766,7 +766,7 @@ internal class OffscreenGlesRenderer(
         GLES20.glUniform1f(rCarX, center[0])
         GLES20.glUniform1f(rCurve, input.roadCurve * ROAD_CURVE_METERS)
         GLES20.glUniform1f(rLanes, laneCount.toFloat())
-        GLES20.glUniform1f(rLaneIndex, input.activeLaneFromRight.coerceIn(0, laneCount - 1).toFloat())
+        GLES20.glUniform1f(rLaneIndex, animator.laneIndex.coerceIn(0f, laneCount - 1f))
         GLES20.glUniform1f(rTravel, animator.travelMeters)
         GLES20.glUniform1fv(rStyles, styles.size, styles, 0)
         GLES20.glUniform1f(rCenterYellow, if (lanes > 0 && !input.roadOneway) 1f else 0f)

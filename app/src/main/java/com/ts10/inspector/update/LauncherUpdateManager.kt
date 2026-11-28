@@ -67,6 +67,7 @@ internal object LauncherUpdateManager {
     private const val PARKED_BEFORE_INSTALL_MS = 30_000L
     const val ACTION_DOWNLOAD = "com.ts10.inspector.update.DOWNLOAD"
     const val ACTION_INSTALL = "com.ts10.inspector.update.INSTALL"
+    private const val INSTALL_RESPONSE_TIMEOUT_MS = 20_000L
     const val ACTION_INSTALL_STATUS = "com.ts10.inspector.update.INSTALL_STATUS"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -77,6 +78,8 @@ internal object LauncherUpdateManager {
     private var appContext: Context? = null
     private var latest: GithubRelease? = null
     private var parkedInstallJob: Job? = null
+    /** Vigila que Android responda tras confirmar la sesión; si no, se puede reintentar. */
+    private var installWatchdog: Job? = null
 
     fun start(context: Context) {
         if (appContext != null) return
@@ -174,6 +177,7 @@ internal object LauncherUpdateManager {
     fun install(context: Context) {
         start(context)
         val app = context.applicationContext
+        TelemetryLog.event("UPDATE", "install requested downloaded=${mutableState.value.downloadedVersion}")
         scope.launch {
             operation.withLock {
                 if (mutableState.value.downloadedVersion == null) downloadLocked(app)
@@ -184,12 +188,23 @@ internal object LauncherUpdateManager {
     }
 
     fun onInstallStatus(context: Context, intent: Intent) {
-        when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+        installWatchdog?.cancel()
+        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        TelemetryLog.event("UPDATE", "install status=$status")
+        when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
-                val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
+                val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: run {
+                    TelemetryLog.event("UPDATE", "install confirmation intent missing")
+                    setStatus(UiText.of(R.string.upd_install_no_response), busy = false)
+                    return
+                }
                 setStatus(UiText.of(R.string.upd_confirm_on_screen), busy = false)
+                // Una pantalla de confirmación anterior que se quedó oculta tras el panel (política
+                // de ventanas QF) recibía el intent y no se veía nada: se abre en una tarea limpia.
+                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 openExclusiveSystemScreen(context, confirm)
+                TelemetryLog.event("UPDATE", "install confirmation opened")
             }
             PackageInstaller.STATUS_SUCCESS -> setStatus(UiText.of(R.string.upd_installed), busy = false)
             else -> {
@@ -287,11 +302,13 @@ internal object LauncherUpdateManager {
         mutableState.update { it.copy(installing = true) }
         // Con root se instala sin diálogo y el launcher se reabre solo; el proceso morirá aquí.
         if (withContext(Dispatchers.IO) { RootPackageInstaller.install(context, file) }) return
+        TelemetryLog.event("UPDATE", "install without root via PackageInstaller")
         withContext(Dispatchers.Main) { commitPackageInstaller(context, file) }
     }
 
     private fun commitPackageInstaller(context: Context, file: File) {
         if (!context.packageManager.canRequestPackageInstalls()) {
+            TelemetryLog.event("UPDATE", "install blocked: unknown sources not allowed")
             setStatus(UiText.of(R.string.upd_allow_installs), busy = false)
             openExclusiveSystemScreen(
                 context,
@@ -301,6 +318,11 @@ internal object LauncherUpdateManager {
         }
         runCatching {
             val installer = context.packageManager.packageInstaller
+            // Sesiones de un intento anterior sin terminar pueden bloquear el nuevo.
+            installer.mySessions.forEach { stale ->
+                runCatching { installer.abandonSession(stale.sessionId) }
+                TelemetryLog.event("UPDATE", "abandoned stale install session ${stale.sessionId}")
+            }
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
                 .apply { setAppPackageName(context.packageName) }
             val sessionId = installer.createSession(params)
@@ -320,10 +342,18 @@ internal object LauncherUpdateManager {
                     flags,
                 )
                 session.commit(callback.intentSender)
+                TelemetryLog.event("UPDATE", "install session $sessionId committed")
             }
             setStatus(UiText.of(R.string.upd_preparing_install), busy = true)
             mutableState.update { it.copy(installing = true) }
+            installWatchdog?.cancel()
+            installWatchdog = scope.launch {
+                delay(INSTALL_RESPONSE_TIMEOUT_MS)
+                TelemetryLog.event("UPDATE", "install no response after ${INSTALL_RESPONSE_TIMEOUT_MS}ms")
+                setStatus(UiText.of(R.string.upd_install_no_response), busy = false)
+            }
         }.onFailure { error ->
+            TelemetryLog.event("UPDATE", "install start failed: ${error.message}")
             setStatus(UiText.of(R.string.upd_install_start_failed, error.uiText()), busy = false)
         }
     }

@@ -106,6 +106,7 @@
     <string name="profile_active">Actief profiel</string>
     <string name="profile_applies_hint">Thema, taal, autokleur en zoom worden toegepast. De gekoppelde telefoon wordt herkend aan zijn Bluetooth-adres; het afdwingen van de verbinding hangt af van het QF-systeem.</string>
     <string name="road_steering_angle">Stuurhoek</string>
+    <string name="road_roundabout">Rotonde</string>
     <string name="action_phone">Telefoon</string>
     <string name="action_voice_assistant">Spraakassistent</string>
     <string name="action_maps">Kaarten</string>
@@ -614,6 +615,7 @@
     <string name="upd_installed">Geïnstalleerd</string>
     <string name="upd_install_cancelled">Installatie geannuleerd</string>
     <string name="upd_install_failed">Installatie mislukt: %1$s</string>
+    <string name="upd_install_no_response">Android reageerde niet op de installatie; tik opnieuw op installeren</string>
     <string name="upd_check_first">Controleer eerst op een nieuwe versie</string>
     <string name="upd_release_missing_apk">De release heeft geen APK en .sha256</string>
     <string name="upd_downloading">%1$s downloaden</string>
@@ -840,6 +842,17 @@
     <string name="adv_usb_camera">USB-camera</string>
     <string name="adv_objects">Objecten, personen en verkeerslichten</string>
     <string name="adv_objects_hint">Experimenteel; uitgeschakeld richt de beeldherkenning zich op rijstrooklijnen en rijstrookwissels</string>
+    <string name="waze_geometry">Waze-venster (test)</string>
+    <string name="waze_geometry_hint">Geldt meteen als Waze in het paneel staat, zonder herstart. Breder neemt 5 % van het linkerpaneel. Worden de onderste knoppen afgesneden, ga terug naar Huidig.</string>
+    <string name="waze_geometry_current">Huidig</string>
+    <string name="waze_geometry_full">Volledige hoogte</string>
+    <string name="waze_geometry_wider">Breder</string>
+    <string name="waze_geometry_wider_full">Breder + volledige hoogte</string>
+    <string name="adv_vision_evidence">Detectiebeelden opslaan</string>
+    <string name="adv_vision_evidence_hint">Slaat uitsneden van borden en verkeerslichten op in Pictures/AstraVision om de herkenning te verbeteren. Niet nodig voor de launcher; beelden ouder dan 14 dagen worden verwijderd.</string>
+    <string name="adv_vision_evidence_delete">Opgeslagen beelden verwijderen</string>
+    <string name="adv_vision_evidence_delete_hint">Verwijdert alle beelden in Pictures/AstraVision</string>
+    <string name="adv_vision_evidence_deleted">%1$d beelden verwijderd</string>
     <string name="adv_swa_blocked">Experimenteel: de ROM van de radio blokkeert ACTION_SWA zonder root.</string>
     <string name="adv_emulate_wheel">QF-stuurwiel emuleren</string>
     <string name="adv_emulate_wheel_hint">Experimenteel: publiceert HS-CAN als ACTION_SWA; zendt nooit naar de auto</string>

@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         TelemetryLog.initialize(applicationContext)
+        com.ts10.inspector.vision.VisionEvidenceRecorder.cleanUp(applicationContext)
         TelemetryLog.event(
             "LAUNCHER",
             "onCreate action=${intent.action ?: "--"} home=${intent.hasCategory(Intent.CATEGORY_HOME)} " +

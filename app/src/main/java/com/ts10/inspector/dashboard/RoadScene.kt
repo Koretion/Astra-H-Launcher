@@ -266,6 +266,12 @@ private fun VehicleView(
         vehicleArtworkResources(vehicleColorMode, darkTheme)
     }
     val bodyImage = ImageBitmap.imageResource(artworkResources.body)
+    // La carretera se desliza al carril nuevo en vez de saltar (como un cambio de carril real).
+    val animatedLane by animateFloatAsState(
+        targetValue = activeLaneFromRight.toFloat(),
+        animationSpec = tween(LaneChangeAnimationMs, easing = FastOutSlowInEasing),
+        label = "Lane change slide",
+    )
     val leftDoorClosed = ImageBitmap.imageResource(artworkResources.leftDoorClosed)
     val rightDoorClosed = ImageBitmap.imageResource(artworkResources.rightDoorClosed)
     val leftDoorOpenImage = ImageBitmap.imageResource(artworkResources.leftDoorOpen)
@@ -347,6 +353,7 @@ private fun VehicleView(
                 roadCurve = roadCurve,
                 speedKmh = state.speedKmh,
                 motionProgress = roadMotionState?.value ?: 0f,
+                animatedLaneFromRight = animatedLane,
             )
             // Keep the approach gradients but clear the climate and media control area.
             drawRect(
@@ -647,3 +654,5 @@ private fun DrawScope.drawVehicleShadow(
         size = androidx.compose.ui.geometry.Size(contactWidth, contactHeight),
     )
 }
+
+private const val LaneChangeAnimationMs = 1_800

@@ -9,6 +9,7 @@ import android.os.Process
 import android.provider.MediaStore
 import com.ts10.inspector.diagnostics.TelemetryLog
 import com.ts10.inspector.environment.OsmRoadContextProvider
+import com.ts10.inspector.settings.DashboardPreferences
 import com.ts10.inspector.vehicle.fuel.distanceMeters
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
@@ -18,6 +19,10 @@ import kotlin.math.max
 /**
  * Bounded local evidence collection for classifiers that need real TS10 camera crops.
  * Only small candidate crops are stored, never continuous video or whole frames.
+ *
+ * Desactivado por defecto (Ajustes › Avanzado): el launcher no usa estas imágenes para funcionar.
+ * Al arrancar se borran las de más de [RETENTION_DAYS] días y, si quedan más de [MAX_STORED], las
+ * más antiguas.
  */
 internal object VisionEvidenceRecorder {
     private val thread = HandlerThread("TS10-vision-evidence", Process.THREAD_PRIORITY_BACKGROUND)
@@ -33,6 +38,7 @@ internal object VisionEvidenceRecorder {
         candidates: List<SpeedSignCandidate>,
         nowElapsed: Long,
     ) {
+        if (!enabled(context)) return
         if (candidates.isEmpty() || !reserve(lastSpeedSaveElapsed, nowElapsed, SPEED_SAVE_INTERVAL_MS)) return
         val captures = candidates.take(MAX_CROPS_PER_EVENT).mapNotNull { candidate ->
             copyRgbCrop(frame, candidate.box, CROP_PADDING)
@@ -61,6 +67,7 @@ internal object VisionEvidenceRecorder {
         detections: List<LocalVisionDetection>,
         nowElapsed: Long,
     ) {
+        if (!enabled(context)) return
         val lights = detections.filter { it.kind == RoadObjectKind.TRAFFIC_LIGHT }
         if (lights.isEmpty() || !reserve(lastLightSaveElapsed, nowElapsed, LIGHT_SAVE_INTERVAL_MS)) return
         val captures = lights.take(MAX_CROPS_PER_EVENT).mapNotNull { detection ->
@@ -75,6 +82,50 @@ internal object VisionEvidenceRecorder {
         }
     }
 
+    private fun enabled(context: Context): Boolean =
+        DashboardPreferences.current(context).visionEvidenceEnabled
+
+    /** Borra en segundo plano las imágenes caducadas o que pasan del máximo. */
+    fun cleanUp(context: Context) {
+        val app = context.applicationContext
+        handler.post {
+            val cutoffSeconds = System.currentTimeMillis() / 1000 - RETENTION_DAYS * 24 * 60 * 60
+            val stored = storedImages(app)
+            val expired = stored.filter { it.second < cutoffSeconds }
+            val overflow = (stored - expired.toSet()).drop(MAX_STORED)
+            val removed = (expired + overflow).count { (uri, _) -> runCatching { app.contentResolver.delete(uri, null, null) > 0 }.getOrDefault(false) }
+            if (removed > 0) TelemetryLog.event("EVIDENCE", "cleanup removed=$removed kept=${stored.size - removed}")
+        }
+    }
+
+    /** Borra todas las imágenes guardadas; [onDone] recibe cuántas se borraron. */
+    fun deleteAll(context: Context, onDone: (Int) -> Unit) {
+        val app = context.applicationContext
+        handler.post {
+            val removed = storedImages(app).count { (uri, _) -> runCatching { app.contentResolver.delete(uri, null, null) > 0 }.getOrDefault(false) }
+            TelemetryLog.event("EVIDENCE", "deleted all removed=$removed")
+            onDone(removed)
+        }
+    }
+
+    /** Imágenes propias en Pictures/AstraVision, de la más reciente a la más antigua (uri, fecha en segundos). */
+    private fun storedImages(context: Context): List<Pair<android.net.Uri, Long>> = runCatching {
+        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        context.contentResolver.query(
+            collection,
+            arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATE_ADDED),
+            "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?",
+            arrayOf("$EVIDENCE_ROOT/%"),
+            "${MediaStore.Images.Media.DATE_ADDED} DESC",
+        )?.use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(android.content.ContentUris.withAppendedId(collection, cursor.getLong(0)) to cursor.getLong(1))
+                }
+            }
+        }.orEmpty()
+    }.getOrDefault(emptyList())
+
     private fun reserve(clock: AtomicLong, nowElapsed: Long, intervalMs: Long): Boolean {
         if (savedThisProcess.get() >= MAX_SAVED_PER_PROCESS) return false
         val previous = clock.get()
@@ -88,7 +139,7 @@ internal object VisionEvidenceRecorder {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, name)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AstraVision/$category")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "$EVIDENCE_ROOT/$category")
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
         runCatching {
@@ -149,4 +200,7 @@ internal object VisionEvidenceRecorder {
     private const val MAX_SAVED_PER_PROCESS = 60
     private const val CROP_PADDING = 0.35f
     private const val JPEG_QUALITY = 92
+    private const val EVIDENCE_ROOT = "Pictures/AstraVision"
+    private const val RETENTION_DAYS = 14L
+    private const val MAX_STORED = 400
 }

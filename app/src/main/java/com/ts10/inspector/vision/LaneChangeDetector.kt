@@ -36,6 +36,8 @@ internal class LaneChangeDetector(private val log: (String) -> Unit = {}) {
     var laneFromRight = 0
         private set
     private var laneCount = 1
+    private var pendingCount: Int? = null
+    private var pendingSinceMs = 0L
 
     private class SteeringPoint(val atMs: Long, val deg: Float)
     private val steeringHistory = ArrayDeque<SteeringPoint>()
@@ -60,17 +62,14 @@ internal class LaneChangeDetector(private val log: (String) -> Unit = {}) {
     fun reset() {
         laneFromRight = 0
         laneCount = 1
+        pendingCount = null
         steeringHistory.clear()
         episode = null
         lastCameraOffset = null
     }
 
     fun update(sample: LaneChangeSample): Int {
-        val count = sample.lanesInTravelDirection?.coerceIn(1, MAX_LANES) ?: 1
-        if (count != laneCount) {
-            laneCount = count
-            laneFromRight = laneFromRight.coerceIn(0, count - 1)
-        }
+        updateLaneCount(sample)
         sample.steeringDeg?.let { steeringHistory.addLast(SteeringPoint(sample.nowMs, it)) }
         while (steeringHistory.isNotEmpty() && sample.nowMs - steeringHistory.first().atMs > HISTORY_MS) {
             steeringHistory.removeFirst()
@@ -117,6 +116,31 @@ internal class LaneChangeDetector(private val log: (String) -> Unit = {}) {
             close(current, sample, "no-confirmation")
         }
         return laneFromRight
+    }
+
+    /**
+     * Más carriles se aplican al momento; menos (o vía desconocida) solo si se mantiene
+     * [LANE_DROP_HOLD_MS]. En la TS10 OSM saltaba unos segundos a un ramal de un carril y eso
+     * devolvía el coche al carril derecho, y el siguiente cambio real a la derecha se rechazaba.
+     */
+    private fun updateLaneCount(sample: LaneChangeSample) {
+        val observed = sample.lanesInTravelDirection?.coerceIn(1, MAX_LANES)
+        when {
+            observed == null || observed == laneCount -> pendingCount = null
+            observed > laneCount -> {
+                laneCount = observed
+                pendingCount = null
+            }
+            pendingCount != observed -> {
+                pendingCount = observed
+                pendingSinceMs = sample.nowMs
+            }
+            sample.nowMs - pendingSinceMs >= LANE_DROP_HOLD_MS -> {
+                laneCount = observed
+                laneFromRight = laneFromRight.coerceIn(0, observed - 1)
+                pendingCount = null
+            }
+        }
     }
 
     private fun open(side: Int, sample: LaneChangeSample, carriedBaseline: Float? = null): Episode {
@@ -240,6 +264,7 @@ internal class LaneChangeDetector(private val log: (String) -> Unit = {}) {
         const val LEFT = 1
         const val RIGHT = -1
         const val MAX_LANES = 6
+        const val LANE_DROP_HOLD_MS = 10_000L
         const val HISTORY_MS = 4_000L
         const val BASELINE_FROM_MS = 300L
         const val BASELINE_TO_MS = 2_500L

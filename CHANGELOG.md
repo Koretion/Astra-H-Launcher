@@ -5,6 +5,35 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.10 — 2026-11-28
+
+Versión Android: `versionCode 71`, `versionName 0.5.10`.
+
+- OSM más estable en la misma vía: la señal de velocidad y los carriles ya no desaparecen unos
+  segundos en enlaces o vías paralelas. Seguir la misma carretera pesa más al elegir la vía, un
+  salto a otra carretera solo se acepta si dura 3 segundos, el límite se conserva hasta un minuto
+  en tramos (o rotondas) que no lo tienen y se mantienen los carriles reales si el tramo nuevo
+  solo los estima.
+- La posición de carril ya no vuelve al carril derecho cuando OSM pierde los carriles un momento:
+  menos carriles solo se aplican si se mantienen 10 segundos. Antes un cambio real a la derecha
+  se rechazaba después de esa pérdida.
+- El cambio de carril se anima: la carretera se desliza al carril nuevo en 1,8 segundos, en 3D y
+  en 2D, en vez de saltar.
+- Los vehículos detectados se colocan en los carriles de la vía, centrados en su carril, sin
+  solaparse; se descartan los que quedan fuera de la calzada y las pistas duplicadas del mismo
+  coche.
+- En una rotonda aparece su señal azul junto al límite de velocidad.
+- Instalación de actualizaciones más robusta sin root: se descartan sesiones anteriores sin
+  terminar, la pantalla de confirmación se abre en una tarea limpia, cada paso queda en el log y,
+  si Android no responde en 20 segundos, se avisa para volver a pulsar instalar.
+- Las imágenes de detecciones (recortes de señales y semáforos en `Pictures/AstraVision`) ya no se
+  guardan por defecto: se activan en Ajustes › Avanzado solo para reunir datos de reconocimiento.
+  Al arrancar se borran las de más de 14 días y nunca quedan más de 400; también se pueden borrar
+  todas desde el mismo apartado.
+- Prueba de la ventana de Waze en Ajustes › Avanzado: actual, alto completo, más ancha (5 % más
+  hacia la izquierda) o ambas. Si Waze está en el panel se aplica al momento sin reiniciarlo, y el
+  log registra la elegida.
+
 ## 0.5.9 — 2026-11-28
 
 Versión Android: `versionCode 70`, `versionName 0.5.9`.

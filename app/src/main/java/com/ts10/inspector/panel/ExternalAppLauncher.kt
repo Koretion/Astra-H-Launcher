@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.graphics.Rect
 import android.provider.Settings
 import android.util.Log
 import com.ts10.inspector.MainActivity
@@ -96,7 +97,12 @@ internal fun launchApplicationInContentArea(
             )
         }
     val finalBounds = if (packageName == WAZE_PACKAGE) {
-        wazeLaunchBounds(contentBounds)
+        val geometry = DashboardPreferences.current(context).wazeGeometry
+        TelemetryLog.event("EXTERNAL_APP", "waze geometry=$geometry")
+        wazeGeometryCoordinates(
+            listOf(contentBounds.left, contentBounds.top, contentBounds.right, contentBounds.bottom),
+            geometry,
+        ).let { Rect(it[0], it[1], it[2], it[3]) }
     } else {
         contentBounds
     }
