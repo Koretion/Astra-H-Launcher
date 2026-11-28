@@ -1,5 +1,7 @@
 package com.ts10.inspector.settings
 
+import com.ts10.inspector.ui.DisplayFormats
+import com.ts10.inspector.ui.rememberDisplayFormats
 import androidx.compose.ui.platform.LocalConfiguration
 import com.ts10.inspector.R
 import androidx.compose.ui.res.stringResource
@@ -60,8 +62,7 @@ internal fun TripsSection(layout: LauncherLayout, width: Float, height: Float, o
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SectionHint(stringResource(R.string.trips_local_history), layout, Modifier.weight(1f))
-                Choice("25", historyLimit == 25, layout) { profilePreferences.setTripHistoryLimit(profiles.activeProfileId, 25) }
-                Choice("50", historyLimit == 50, layout) { profilePreferences.setTripHistoryLimit(profiles.activeProfileId, 50) }
+                SegmentedControl(listOf(25, 50), historyLimit, { it.toString() }, { profilePreferences.setTripHistoryLimit(profiles.activeProfileId, it) }, layout)
             }
         }
         item { ActionRow(stringResource(R.string.trips_configure), stringResource(R.string.trips_configure_hint), layout, true, onConfigure) }
@@ -91,17 +92,18 @@ private fun tripDriverName(trip: VehicleTripSummary): String {
 @Composable
 private fun TripRow(trip: VehicleTripSummary, layout: LauncherLayout, width: Float, onClick: () -> Unit) {
     val colors = LocalDashboardColors.current
+    val formats = rememberDisplayFormats()
     Row(
         modifier = Modifier.size(layout.dp(width), layout.dp(54)).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(formatTripDate(trip.startUtc, LocalConfiguration.current.locales[0]), color = colors.primary, fontSize = layout.sp(11), fontWeight = FontWeight.Bold)
+            Text(formatTripDate(trip.startUtc, formats), color = colors.primary, fontSize = layout.sp(11), fontWeight = FontWeight.Bold)
             Text("${tripDriverName(trip)} · ${formatTripDuration(trip)}", color = colors.muted, fontSize = layout.sp(8))
         }
-        TripValue(String.format(Locale.getDefault(), "%.1f km", trip.distanceKm), stringResource(R.string.trips_distance), layout)
-        TripValue(String.format(Locale.getDefault(), "%.0f km/h", trip.averageSpeedKmh), stringResource(R.string.trips_average), layout)
-        TripValue(trip.consumptionLitersPer100Km?.let { String.format(Locale.getDefault(), "%.1f L/100", it) } ?: "--", stringResource(R.string.trips_consumption), layout)
+        TripValue(formats.distanceText(trip.distanceKm), stringResource(R.string.trips_distance), layout)
+        TripValue(formats.speedText(trip.averageSpeedKmh), stringResource(R.string.trips_average), layout)
+        TripValue(trip.consumptionLitersPer100Km?.let { formats.consumptionText(it) } ?: "--", stringResource(R.string.trips_consumption), layout)
         Icon(Icons.Outlined.ChevronRight, null, tint = colors.muted, modifier = Modifier.size(layout.dp(18)))
     }
 }
@@ -118,16 +120,17 @@ private fun TripValue(value: String, label: String, layout: LauncherLayout) {
 @Composable
 private fun TripDetail(trip: VehicleTripSummary, layout: LauncherLayout, width: Float, onBack: () -> Unit) {
     val colors = LocalDashboardColors.current
+    val formats = rememberDisplayFormats()
     SettingsCard(layout, width) {
         Text(stringResource(R.string.trips_back), color = Color(0xFF2E9D50), fontSize = layout.sp(8), fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onBack))
-        Text(formatTripDate(trip.startUtc, LocalConfiguration.current.locales[0]), color = colors.primary, fontSize = layout.sp(14), fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = layout.dp(5)))
+        Text(formatTripDate(trip.startUtc, formats), color = colors.primary, fontSize = layout.sp(14), fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = layout.dp(5)))
         Text(stringResource(R.string.trips_driver, tripDriverName(trip)), color = colors.muted, fontSize = layout.sp(8), modifier = Modifier.padding(bottom = layout.dp(5)))
         RoutePreview(trip.route, layout, width - 24f)
         Row(modifier = Modifier.padding(top = layout.dp(7))) {
-            TripValue(String.format(Locale.getDefault(), "%.1f km", trip.distanceKm), stringResource(R.string.trips_distance), layout)
-            TripValue(String.format(Locale.getDefault(), "%.0f km/h", trip.averageSpeedKmh), stringResource(R.string.trips_average_speed), layout)
-            TripValue(String.format(Locale.getDefault(), "%.0f km/h", trip.maxSpeedKmh), stringResource(R.string.trips_max), layout)
-            TripValue(trip.consumptionLitersPer100Km?.let { String.format(Locale.getDefault(), "%.1f L/100", it) } ?: stringResource(R.string.trips_consumption_pending), stringResource(R.string.trips_consumption), layout)
+            TripValue(formats.distanceText(trip.distanceKm), stringResource(R.string.trips_distance), layout)
+            TripValue(formats.speedText(trip.averageSpeedKmh), stringResource(R.string.trips_average_speed), layout)
+            TripValue(formats.speedText(trip.maxSpeedKmh), stringResource(R.string.trips_max), layout)
+            TripValue(trip.consumptionLitersPer100Km?.let { formats.consumptionText(it) } ?: stringResource(R.string.trips_consumption_pending), stringResource(R.string.trips_consumption), layout)
         }
     }
 }
@@ -169,8 +172,8 @@ private fun RoutePreview(points: List<VehicleTripMapPoint>, layout: LauncherLayo
     }
 }
 
-private fun formatTripDate(utc: String, locale: Locale): String = runCatching {
-    Instant.parse(utc).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE d MMM · HH:mm", locale))
+private fun formatTripDate(utc: String, formats: DisplayFormats): String = runCatching {
+    formats.dayAndTime(Instant.parse(utc).atZone(ZoneId.systemDefault()))
 }.getOrDefault(utc)
 
 private fun formatTripDuration(trip: VehicleTripSummary): String = runCatching {

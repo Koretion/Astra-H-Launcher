@@ -43,6 +43,7 @@ uniform vec3 uBackground;
 uniform vec3 uFloor;
 uniform vec2 uFloorCenter;
 uniform vec2 uFloorRadius;
+#define FLOOR_EDGE 0.95
 uniform float uFadeBottom;
 uniform float uCabin;
 uniform vec3 uCabinMin;
@@ -88,21 +89,23 @@ void main() {
     color = (color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14);
     vec3 srgb = pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.2));
     if (uMirror > 0.5) {
-        // Same spot as FLOOR_FRAGMENT_SHADER so the faded reflection melts into the floor.
+        // Reflejo con alfa sobre el disco del suelo ya dibujado: solo dentro del disco
+        // (mismo borde que FLOOR_FRAGMENT_SHADER) y desvaneciéndose con la profundidad.
         float d = length((vWorld.xz - uFloorCenter) / uFloorRadius);
         // gl_FragCoord.y is 0 at the bottom edge of the frame: nothing may end in a hard cut there.
         float screen = smoothstep(0.0, uFadeBottom, gl_FragCoord.y);
-        vec3 floorColor = mix(uBackground, uFloor, (1.0 - smoothstep(0.15, 1.0, d)) * screen);
+        float disc = 1.0 - smoothstep(FLOOR_EDGE, 1.0, d);
         float depth = 1.0 - smoothstep(0.0, uFadeHeight, uFloorY - vWorld.y);
-        float fade = depth * uReflect * screen * screen;
-        srgb = mix(floorColor, srgb, fade);
+        gl_FragColor = vec4(srgb, base.a * depth * uReflect * screen * disc);
+    } else {
+        gl_FragColor = vec4(srgb, base.a);
     }
-    gl_FragColor = vec4(srgb, base.a);
 }
 """
 
 internal const val FLOOR_FRAGMENT_SHADER = """
 precision mediump float;
+#define FLOOR_EDGE 0.95
 uniform vec3 uBackground;
 uniform vec3 uFloor;
 uniform float uFadeBottom;
@@ -110,7 +113,27 @@ varying vec2 vLocal;
 void main() {
     float d = length(vLocal);
     float screen = smoothstep(0.0, uFadeBottom, gl_FragCoord.y);
-    gl_FragColor = vec4(mix(uBackground, uFloor, (1.0 - smoothstep(0.15, 1.0, d)) * screen), 1.0);
+    // Disco de exposición con borde nítido y una ligera viñeta interior.
+    vec3 color = uFloor * (1.0 - 0.07 * d * d);
+    gl_FragColor = vec4(color, (1.0 - smoothstep(FLOOR_EDGE, 1.0, d)) * screen);
+}
+"""
+
+/**
+ * Pared del estudio de fotografía, dibujada a pantalla completa con alfa: se aclara hacia el
+ * horizonte y se funde con el panel arriba, abajo y en los laterales (sin bordes rectos).
+ */
+internal const val STUDIO_FRAGMENT_SHADER = """
+precision mediump float;
+uniform vec3 uWall;
+uniform float uStrength;
+uniform float uHorizon;
+varying vec2 vLocal;
+void main() {
+    float t = 0.5 - vLocal.y * 0.5;
+    float vertical = smoothstep(0.0, uHorizon, t) * (1.0 - smoothstep(0.82, 1.0, t));
+    float horizontal = 1.0 - smoothstep(0.45, 1.0, abs(vLocal.x));
+    gl_FragColor = vec4(uWall, vertical * horizontal * uStrength);
 }
 """
 
@@ -130,7 +153,8 @@ uniform float uStrength;
 varying vec2 vLocal;
 void main() {
     float d = length(vLocal);
-    gl_FragColor = vec4(0.0, 0.0, 0.0, (1.0 - smoothstep(0.45, 1.0, d)) * uStrength);
+    // Sombra de contacto: núcleo oscuro bajo el coche y borde corto.
+    gl_FragColor = vec4(0.0, 0.0, 0.0, (1.0 - smoothstep(0.35, 0.9, d)) * uStrength);
 }
 """
 

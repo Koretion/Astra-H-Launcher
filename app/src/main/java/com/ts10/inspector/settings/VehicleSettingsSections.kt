@@ -1,5 +1,6 @@
 package com.ts10.inspector.settings
 
+import com.ts10.inspector.ui.rememberDisplayFormats
 import com.ts10.inspector.vehicle.can.profile.CanSignals
 import com.ts10.inspector.ui.text
 import com.ts10.inspector.R
@@ -33,6 +34,7 @@ import java.util.Locale
 
 @Composable
 internal fun OverviewSection(layout: LauncherLayout, width: Float, height: Float) {
+    val formats = rememberDisplayFormats()
     val context = LocalContext.current
     val state by LauncherRuntime.state.collectAsStateWithLifecycle()
     val diagnostics by LauncherRuntime.diagnostics.collectAsStateWithLifecycle()
@@ -45,15 +47,15 @@ internal fun OverviewSection(layout: LauncherLayout, width: Float, height: Float
     LazyColumn(modifier = Modifier.size(layout.dp(width), layout.dp(height))) {
         item { SectionHint(stringResource(R.string.overview_hint), layout) }
         item { SettingsCard(layout, width) {
-            MetricRow(stringResource(R.string.metric_speed), "${state.speedKmh} km/h", state.speedSource, layout)
+            MetricRow(stringResource(R.string.metric_speed), formats.speedText(state.speedKmh), state.speedSource, layout)
             MetricRow(stringResource(R.string.metric_engine), signals.engineRpm?.let { "${it.value} rpm" } ?: diagnostics.engineRpm.takeUnless { it == "No data" } ?: stringResource(R.string.common_no_data), signals.engineRpm?.source?.label ?: "CAN Box", layout)
-            MetricRow(stringResource(R.string.metric_range), fuel.rangeKm?.let { "$it km" } ?: stringResource(R.string.common_pending), fuel.fuelSource.text(), layout)
-            MetricRow(stringResource(R.string.metric_odometer), mileage.vehicleOdometerKm?.let(::formatMileage) ?: stringResource(R.string.common_pending), mileage.vehicleOdometerSource, layout)
+            MetricRow(stringResource(R.string.metric_range), fuel.rangeKm?.let { formats.distanceText(it, 0) } ?: stringResource(R.string.common_pending), fuel.fuelSource.text(), layout)
+            MetricRow(stringResource(R.string.metric_odometer), mileage.vehicleOdometerKm?.let { formatMileage(it, formats) } ?: stringResource(R.string.common_pending), mileage.vehicleOdometerSource, layout)
             MetricRow(stringResource(R.string.metric_battery_12v), can.swBatteryVoltage?.let { String.format(Locale.getDefault(), "%.2f V", it) } ?: stringResource(R.string.common_pending), canSource(CanSignals.BATTERY_VOLTAGE), layout)
-            MetricRow(stringResource(R.string.metric_battery_maintenance), stringResource(battery.statusText), battery.replacementDate?.let { stringResource(R.string.metric_battery_replacement, formatBatteryDate(it)) } ?: stringResource(R.string.metric_no_date), layout)
+            MetricRow(stringResource(R.string.metric_battery_maintenance), stringResource(battery.statusText), battery.replacementDate?.let { stringResource(R.string.metric_battery_replacement, formatBatteryDate(it, formats)) } ?: stringResource(R.string.metric_no_date), layout)
         } }
         item { SettingsCard(layout, width) {
-            MetricRow(stringResource(R.string.metric_current_trip), String.format(Locale.getDefault(), "%.1f km", mileage.currentTripKm), stringResource(R.string.metric_odometer_source), layout)
+            MetricRow(stringResource(R.string.metric_current_trip), formats.distanceText(mileage.currentTripKm), stringResource(R.string.metric_odometer_source), layout)
             MetricRow(stringResource(R.string.metric_doors), if (state.frontLeftDoorOpen || state.frontRightDoorOpen || state.rearLeftDoorOpen || state.rearRightDoorOpen || state.trunkOpen || state.bonnetOpen) stringResource(R.string.doors_some_open) else stringResource(R.string.doors_all_closed), "SW-CAN / CAN Box", layout)
             MetricRow(
                 if (obd.troubleCodesRead) stringResource(R.string.metric_faults_count, obd.troubleCodes.size) else stringResource(R.string.metric_faults),
@@ -67,6 +69,7 @@ internal fun OverviewSection(layout: LauncherLayout, width: Float, height: Float
 
 @Composable
 internal fun EngineSection(layout: LauncherLayout, width: Float, height: Float) {
+    val formats = rememberDisplayFormats()
     val context = LocalContext.current
     val obd by Obd2Client.state.collectAsStateWithLifecycle()
     val can by Esp32CanClient.state.collectAsStateWithLifecycle()
@@ -85,14 +88,14 @@ internal fun EngineSection(layout: LauncherLayout, width: Float, height: Float) 
     LazyColumn(modifier = Modifier.size(layout.dp(width), layout.dp(height))) {
         item { SectionHint(stringResource(R.string.engine_hint), layout) }
         item { SettingsCard(layout, width) {
-            MetricRow(stringResource(R.string.metric_speed), "${launcher.speedKmh} km/h", launcher.speedSource, layout)
-            MetricRow(stringResource(R.string.metric_range), fuel.rangeKm?.let { "$it km" } ?: stringResource(R.string.common_pending), fuel.fuelSource.text(), layout)
+            MetricRow(stringResource(R.string.metric_speed), formats.speedText(launcher.speedKmh), launcher.speedSource, layout)
+            MetricRow(stringResource(R.string.metric_range), fuel.rangeKm?.let { formats.distanceText(it, 0) } ?: stringResource(R.string.common_pending), fuel.fuelSource.text(), layout)
             MetricRow(stringResource(R.string.metric_rpm), signals.engineRpm?.let { "${it.value} rpm" } ?: diagnostics.engineRpm.takeUnless { it == "No data" } ?: stringResource(R.string.common_no_data), signals.engineRpm?.source?.label ?: "CAN Box", layout)
-            MetricRow(stringResource(R.string.metric_coolant), signals.coolantCelsius?.let { "${it.value} °C" } ?: stringResource(R.string.common_pending), signals.coolantCelsius?.source?.label ?: "GMLAN-USB HS-CAN / OBD2 PID 05", layout)
-            MetricRow(stringResource(R.string.metric_oil), obd.oilCelsius?.let { "$it °C" } ?: stringResource(R.string.common_pending), "OBD2 PID 5C", layout)
+            MetricRow(stringResource(R.string.metric_coolant), signals.coolantCelsius?.let { formats.temperatureText(it.value) } ?: stringResource(R.string.common_pending), signals.coolantCelsius?.source?.label ?: "GMLAN-USB HS-CAN / OBD2 PID 05", layout)
+            MetricRow(stringResource(R.string.metric_oil), obd.oilCelsius?.let { formats.temperatureText(it) } ?: stringResource(R.string.common_pending), "OBD2 PID 5C", layout)
             MetricRow(
                 stringResource(R.string.metric_instant_consumption),
-                effectiveConsumption?.let { String.format(Locale.getDefault(), "%.1f L/100", it) }
+                effectiveConsumption?.let { formats.consumptionText(it) }
                     ?: effectiveFuelRate?.let { String.format(Locale.getDefault(), "%.2f L/h", it) }
                     ?: stringResource(R.string.common_pending),
                 if (effectiveConsumption != null) "MAF/caudal + ${launcher.speedSource}" else stringResource(R.string.metric_idle_flow),
@@ -121,7 +124,7 @@ internal fun EngineSection(layout: LauncherLayout, width: Float, height: Float) 
             )
             MetricRow(
                 stringResource(R.string.speed_warning_from),
-                "${speedWarning.minimumSpeedKmh} km/h",
+                formats.speedText(speedWarning.minimumSpeedKmh),
                 stringResource(R.string.speed_warning_from_hint),
                 layout,
             )
@@ -160,14 +163,14 @@ internal fun EngineSection(layout: LauncherLayout, width: Float, height: Float) 
         item { SettingsCard(layout, width) {
             MetricRow(
                 stringResource(R.string.mileage_vehicle_odometer),
-                mileage.vehicleOdometerKm?.let(::formatMileage) ?: stringResource(R.string.common_pending),
+                mileage.vehicleOdometerKm?.let { formatMileage(it, formats) } ?: stringResource(R.string.common_pending),
                 mileage.vehicleOdometerSource,
                 layout,
             )
-            MetricRow(stringResource(R.string.mileage_recorded_by, profiles.profiles.firstOrNull { it.id == mileage.activeProfileId }?.name ?: mileage.activeProfileName), formatMileage(mileage.recordedKm), mileage.distanceSource, layout)
-            MetricRow(stringResource(R.string.mileage_partial), formatMileage(mileage.partialKm), mileage.distanceSource, layout)
+            MetricRow(stringResource(R.string.mileage_recorded_by, profiles.profiles.firstOrNull { it.id == mileage.activeProfileId }?.name ?: mileage.activeProfileName), formatMileage(mileage.recordedKm, formats), mileage.distanceSource, layout)
+            MetricRow(stringResource(R.string.mileage_partial), formatMileage(mileage.partialKm, formats), mileage.distanceSource, layout)
             ActionRow(stringResource(R.string.mileage_reset_partial), stringResource(R.string.mileage_reset_partial_hint), layout, true, VehicleMileageTracker::resetPartial)
-            MetricRow(stringResource(R.string.mileage_since_refuel), formatMileage(mileage.sinceRefuelKm), mileage.distanceSource, layout)
+            MetricRow(stringResource(R.string.mileage_since_refuel), formatMileage(mileage.sinceRefuelKm, formats), mileage.distanceSource, layout)
             RefuelRegistration(layout)
         } }
         item { SettingsCard(layout, width) {
@@ -253,6 +256,7 @@ internal fun showIndividualTurnIndicators(hazardActive: Boolean): Boolean = !haz
 
 @Composable
 internal fun ComfortSection(layout: LauncherLayout, width: Float, height: Float) {
+    val formats = rememberDisplayFormats()
     val state by LauncherRuntime.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val preferences = remember(context) { DashboardPreferences.get(context) }
@@ -263,7 +267,7 @@ internal fun ComfortSection(layout: LauncherLayout, width: Float, height: Float)
         item { SettingsCard(layout, width) {
             MetricRow(stringResource(R.string.comfort_climate), if (state.climatePower == true) state.climateMode else stringResource(R.string.comfort_climate_off), "CAN Box", layout)
             MetricRow(stringResource(R.string.comfort_cabin_temp), state.cabinTemperature, "CAN Box", layout)
-            MetricRow(stringResource(R.string.comfort_outside_temp), esp32Can.swOutdoorTemperatureCelsius?.let { String.format(Locale.getDefault(), "%.1f °C", it) } ?: state.outdoorTemperature, if (esp32Can.swOutdoorTemperatureCelsius != null) canSource(CanSignals.OUTDOOR_TEMPERATURE_C) else stringResource(R.string.comfort_outside_source), layout)
+            MetricRow(stringResource(R.string.comfort_outside_temp), esp32Can.swOutdoorTemperatureCelsius?.let { formats.temperatureText(it, decimals = 1) } ?: formats.temperatureLabel(state.outdoorTemperature), if (esp32Can.swOutdoorTemperatureCelsius != null) canSource(CanSignals.OUTDOOR_TEMPERATURE_C) else stringResource(R.string.comfort_outside_source), layout)
             MetricRow(stringResource(R.string.comfort_fan), state.climateFanLevel?.let { stringResource(R.string.comfort_fan_level, it.toString()) } ?: stringResource(R.string.common_pending), "CAN Box", layout)
             MetricRow(stringResource(R.string.comfort_last_window), esp32Can.swWindowAction?.let { stringResource(it.text) } ?: stringResource(R.string.common_no_activity), canSource(CanSignals.WINDOW_ACTION), layout)
             MetricRow(stringResource(R.string.comfort_wipers), esp32Can.swWiperMode?.let { stringResource(it.text) } ?: stringResource(R.string.common_no_data), canSource(CanSignals.WIPER_MODE), layout)

@@ -1,6 +1,5 @@
 package com.ts10.inspector.ui
 
-import androidx.compose.ui.platform.LocalConfiguration
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,8 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Immutable
 internal data class DashboardClock(val dateLabel: String, val timeLabel: String)
@@ -23,13 +20,13 @@ internal data class DashboardClock(val dateLabel: String, val timeLabel: String)
 @Composable
 internal fun rememberSystemClock(): DashboardClock {
     val context = LocalContext.current
-    val locale = LocalConfiguration.current.locales[0]
-    var clock by remember(locale) { mutableStateOf(currentSystemClock(locale)) }
+    val formats = rememberDisplayFormats()
+    var clock by remember(formats) { mutableStateOf(currentSystemClock(formats)) }
 
-    DisposableEffect(context, locale) {
+    DisposableEffect(context, formats) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                clock = currentSystemClock(locale)
+                clock = currentSystemClock(formats)
             }
         }
         val filter = IntentFilter().apply {
@@ -44,12 +41,7 @@ internal fun rememberSystemClock(): DashboardClock {
     return clock
 }
 
-private fun currentSystemClock(locale: Locale): DashboardClock {
+private fun currentSystemClock(formats: DisplayFormats): DashboardClock {
     val now = ZonedDateTime.now()
-    val date = now.format(DateTimeFormatter.ofPattern("EEEE d", locale))
-        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
-    return DashboardClock(
-        dateLabel = date,
-        timeLabel = now.format(DateTimeFormatter.ofPattern("HH:mm", locale)),
-    )
+    return DashboardClock(dateLabel = formats.dashboardDate(now), timeLabel = formats.time(now))
 }

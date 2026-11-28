@@ -298,15 +298,7 @@ internal fun BluetoothActionRow(
             .padding(vertical = layout.dp(3))
             .fillMaxWidth()
             .height(layout.dp(47))
-            .background(
-                colors.primary.copy(alpha = if (colors.dark) .09f else .065f),
-                RoundedCornerShape(layout.dp(5)),
-            )
-            .border(
-                layout.dp(1),
-                colors.divider.copy(alpha = if (colors.dark) .28f else .16f),
-                RoundedCornerShape(layout.dp(5)),
-            )
+            .teslaButton(colors, layout, enabled = enabled)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = layout.dp(12)),
         verticalAlignment = Alignment.CenterVertically,

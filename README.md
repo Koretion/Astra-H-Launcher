@@ -73,7 +73,7 @@ Taken on the Android emulator, so there is no live vehicle data (`--` / *No data
   detection. It is **informational only**, not an ADAS.
 - **Trips:** local SQLite log and optional upload to your own Google Sheets spreadsheet.
 - **Driver profiles**, recognised by the ignition key (with the GMLAN-USB).
-- **Languages:** English, Spanish, German, French, Italian and Portuguese; follows Android
+- **Languages:** English, Spanish, German, French, Italian, Portuguese, Dutch and Polish; follows Android
   automatically or can be chosen per driver.
 - **Updates:** checks GitHub Releases for new launcher versions and for the GMLAN-USB firmware;
   notify only, download and notify, or install silently while parked.

@@ -5,6 +5,33 @@ la primera versión pública.
 
 Cada versión publicada en GitHub Releases usa como notas su sección de este archivo.
 
+## 0.5.9 — 2026-11-28
+
+Versión Android: `versionCode 70`, `versionName 0.5.9`.
+
+- Al pararse, la vista ya no pasa enseguida a «coche parado»: espera 10 segundos (30 si la cámara
+  ve un semáforo en rojo), así que un stop o un paso de cebra no gira el coche para volver a
+  girarlo segundos después. Con el freno de mano o una puerta, el capó o el maletero abiertos
+  cambia al momento. Vale para el coche 3D, la escena 2D y el límite de velocidad.
+- Unidades y formatos en Ajustes › Pantalla: velocidad en km/h o mph, temperatura en °C o °F,
+  hora automática, 12 h (AM/PM) o 24 h, y fecha automática, española, inglesa o americana. Con
+  mph todo pasa a imperial: distancias, autonomía y cuentakilómetros en millas y consumo en mpg.
+- La fecha del panel muestra el día de la semana y el número («Viernes 27»).
+- Ajustes con estilo Tesla: las opciones son controles segmentados, todos los botones comparten
+  el mismo aspecto y las listas largas (idioma, formato de fecha) se eligen en un desplegable.
+- Color del coche 3D con círculos de color y una paleta para elegir cualquier tono.
+- Nuevo color del suelo 3D: suelo de estudio, negro, gris, cinco colores o la paleta.
+- Escena 3D tipo sala de exposición: el coche está sobre un disco con reflejo nítido, delante
+  de una pared de estudio que se funde con el panel, y con una sombra de contacto más definida.
+  Faros, haces y luces sobre el suelo se ven mucho más al encenderlos.
+- Rendimiento: el coche 3D ya no ocupa la GPU sin pausa. Limita su uso al 60 % (en la TS10, unos
+  11 fps al circular) y, al abrir una app en el panel derecho, baja a 4 fps durante 6 segundos
+  para que arranque antes. Corrige que Spotify o la radio tardaran en aparecer y que la barra
+  superior de QF se quedara en blanco.
+- La señal de límite de velocidad ya no lleva poste.
+- Nuevos idiomas: neerlandés y polaco. Se eligen en Ajustes › Pantalla › Idioma o se activan solos
+  si Android está en uno de ellos; se guardan por perfil de conductor como los demás.
+
 ## 0.5.8 — 2026-11-25
 
 Versión Android: `versionCode 69`, `versionName 0.5.8`.

@@ -1,5 +1,6 @@
 package com.ts10.inspector.dashboard
 
+import com.ts10.inspector.ui.rememberDisplayFormats
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -52,6 +53,7 @@ internal fun VehicleTopIndicators(
     val vehicle by LauncherRuntime.state.collectAsStateWithLifecycle()
     val fuel by FuelRangeEstimator.state.collectAsStateWithLifecycle()
     val temperature = signals.coolantCelsius?.value
+    val formats = rememberDisplayFormats()
     val colors = LocalDashboardColors.current
     var leftPulseUntil by remember { mutableStateOf(0L) }
     var rightPulseUntil by remember { mutableStateOf(0L) }
@@ -149,7 +151,7 @@ internal fun VehicleTopIndicators(
                     modifier = Modifier.size(layout.dp(22)),
                 )
                 Text(
-                    text = "$temperature \u00b0C",
+                    text = formats.temperatureText(temperature),
                     color = indicatorColor,
                     fontSize = layout.sp(15),
                     lineHeight = layout.sp(17),

@@ -73,7 +73,7 @@ Tomadas en el emulador de Android, por eso no hay datos reales del vehículo (`-
   y carriles. Es **informativa**, no un sistema ADAS.
 - **Trayectos:** registro local en SQLite y subida opcional a una hoja de Google Sheets propia.
 - **Perfiles de conductor** reconocidos por la llave de contacto (con el GMLAN-USB).
-- **Idiomas:** español, inglés, alemán, francés, italiano y portugués; automático según Android o
+- **Idiomas:** español, inglés, alemán, francés, italiano, portugués, neerlandés y polaco; automático según Android o
   elegido por conductor.
 - **Actualizaciones:** comprueba GitHub Releases para nuevas versiones del launcher y del firmware
   GMLAN-USB; solo avisar, descargar y avisar, o instalar sin avisar con el coche parado.

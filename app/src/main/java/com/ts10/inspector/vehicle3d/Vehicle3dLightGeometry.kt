@@ -35,9 +35,9 @@ private const val LAMP_INSET = 0.12f
 internal const val BEAM_SEGMENTS = 24
 /** Bytes per beam vertex: x, y, z and the distance along the beam. */
 internal const val BEAM_STRIDE = 16
-internal val DIPPED_BEAM = BeamSpec(length = 12f, halfWidthDegrees = 20f, halfHeightDegrees = 5f, tiltDegrees = 2.5f, strength = 0.16f)
-internal val HIGH_BEAM = BeamSpec(length = 24f, halfWidthDegrees = 12f, halfHeightDegrees = 5f, tiltDegrees = 0.5f, strength = 0.13f)
-internal val FOG_BEAM = BeamSpec(length = 7f, halfWidthDegrees = 34f, halfHeightDegrees = 4f, tiltDegrees = 3f, strength = 0.16f)
+internal val DIPPED_BEAM = BeamSpec(length = 12f, halfWidthDegrees = 20f, halfHeightDegrees = 5f, tiltDegrees = 2.5f, strength = 0.24f)
+internal val HIGH_BEAM = BeamSpec(length = 24f, halfWidthDegrees = 12f, halfHeightDegrees = 5f, tiltDegrees = 0.5f, strength = 0.2f)
+internal val FOG_BEAM = BeamSpec(length = 7f, halfWidthDegrees = 34f, halfHeightDegrees = 4f, tiltDegrees = 3f, strength = 0.22f)
 
 /** World bounds of every light node subtree, measured in the rest pose. */
 private fun lightBounds(

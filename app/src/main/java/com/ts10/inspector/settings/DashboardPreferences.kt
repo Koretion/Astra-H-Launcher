@@ -37,7 +37,36 @@ data class DashboardSettings(
     val localVisionSource: LocalVisionSource = LocalVisionSource.DASHCAM,
     val localVisionCaptureMode: LocalVisionCaptureMode = LocalVisionCaptureMode.PRIVATE_GL,
     val localVisionObjectsEnabled: Boolean = false,
+    val speedUnit: SpeedUnit = SpeedUnit.KMH,
+    val temperatureUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
+    val timeFormat: TimeFormatMode = TimeFormatMode.AUTO,
+    val dateFormat: DateFormatMode = DateFormatMode.AUTO,
+    /** Color elegido en la paleta para [Vehicle3dPaint.CUSTOM]. */
+    val vehiclePaintCustomArgb: Int = 0xFF2E7D5B.toInt(),
+    /** Color del suelo del showroom 3D; null es el suelo de estudio por defecto. */
+    val floorColorArgb: Int? = null,
+) {
+    fun vehiclePaintArgb(themeArgb: Int): Int = when (vehiclePaint) {
+        Vehicle3dPaint.CUSTOM -> vehiclePaintCustomArgb
+        Vehicle3dPaint.THEME -> themeArgb
+        else -> vehiclePaint.argb ?: themeArgb
+    }
+}
+
+/** Colores rápidos del suelo 3D (además del de estudio y la paleta). */
+val FLOOR_PRESET_COLORS = listOf(
+    0xFF000000.toInt(), 0xFF808080.toInt(), 0xFF3D6FE0.toInt(), 0xFF16A3A0.toInt(), 0xFFE0533D.toInt(), 0xFF8E5BE0.toInt(), 0xFFD9A030.toInt(),
 )
+
+enum class SpeedUnit(val label: String) { KMH("km/h"), MPH("mph") }
+
+enum class TemperatureUnit(val label: String) { CELSIUS("°C"), FAHRENHEIT("°F") }
+
+/** AUTO sigue el ajuste 12/24 h de Android. */
+enum class TimeFormatMode { AUTO, H12, H24 }
+
+/** AUTO elige según el idioma y país del sistema. */
+enum class DateFormatMode { AUTO, SPANISH, ENGLISH, AMERICAN }
 
 enum class DashboardDrivingZoomMode(
     val label: String,
@@ -87,6 +116,7 @@ enum class Vehicle3dPaint(@StringRes val label: Int, val argb: Int?) {
     BLUE(R.string.paint_blue, 0xFF1D4FB0.toInt()),
     YELLOW(R.string.paint_yellow, 0xFFE8B10E.toInt()),
     THEME(R.string.paint_theme, null),
+    CUSTOM(R.string.paint_custom, null),
 }
 
 enum class DashboardCameraMode {
@@ -206,6 +236,16 @@ class DashboardPreferences private constructor(private val context: Context) {
     fun setVehicleColorMode(mode: DashboardVehicleColorMode) = edit(KEY_VEHICLE_COLOR_MODE, mode.name)
     fun setDrivingZoomMode(mode: DashboardDrivingZoomMode) = edit(KEY_DRIVING_ZOOM_MODE, mode.name)
     fun setVehiclePaint(paint: Vehicle3dPaint) = edit(KEY_VEHICLE_PAINT, paint.name)
+    fun setSpeedUnit(unit: SpeedUnit) = edit(KEY_SPEED_UNIT, unit.name)
+    fun setTemperatureUnit(unit: TemperatureUnit) = edit(KEY_TEMPERATURE_UNIT, unit.name)
+    fun setTimeFormat(mode: TimeFormatMode) = edit(KEY_TIME_FORMAT, mode.name)
+    fun setDateFormat(mode: DateFormatMode) = edit(KEY_DATE_FORMAT, mode.name)
+    fun setVehiclePaintCustom(argb: Int) {
+        preferences.edit().putInt(KEY_VEHICLE_PAINT_CUSTOM, argb).putString(KEY_VEHICLE_PAINT, Vehicle3dPaint.CUSTOM.name).apply()
+    }
+    fun setFloorColor(argb: Int?) {
+        preferences.edit().apply { if (argb == null) remove(KEY_FLOOR_COLOR) else putInt(KEY_FLOOR_COLOR, argb) }.apply()
+    }
 
     /** Persisted opt-in switch for the compatible dashboard trial; 2D remains the safe default. */
     fun setVehicleSceneMode(mode: VehicleSceneMode) = edit(KEY_VEHICLE_SCENE_MODE, mode.name)
@@ -276,6 +316,12 @@ class DashboardPreferences private constructor(private val context: Context) {
         private const val KEY_LOCAL_VISION_SOURCE = "local_vision_source"
         private const val KEY_LOCAL_VISION_CAPTURE_MODE = "local_vision_capture_mode"
         private const val KEY_LOCAL_VISION_OBJECTS = "local_vision_objects_enabled"
+        private const val KEY_SPEED_UNIT = "speed_unit"
+        private const val KEY_TEMPERATURE_UNIT = "temperature_unit"
+        private const val KEY_TIME_FORMAT = "time_format"
+        private const val KEY_DATE_FORMAT = "date_format"
+        private const val KEY_VEHICLE_PAINT_CUSTOM = "vehicle_3d_paint_custom"
+        private const val KEY_FLOOR_COLOR = "vehicle_3d_floor_color"
         private const val SEPARATOR = "|"
 
         @Volatile
@@ -366,6 +412,15 @@ class DashboardPreferences private constructor(private val context: Context) {
                 )
             }.getOrDefault(LocalVisionCaptureMode.PRIVATE_GL),
             localVisionObjectsEnabled = preferences.getBoolean(KEY_LOCAL_VISION_OBJECTS, false),
+            speedUnit = preferences.enumValue(KEY_SPEED_UNIT, SpeedUnit.KMH),
+            temperatureUnit = preferences.enumValue(KEY_TEMPERATURE_UNIT, TemperatureUnit.CELSIUS),
+            timeFormat = preferences.enumValue(KEY_TIME_FORMAT, TimeFormatMode.AUTO),
+            dateFormat = preferences.enumValue(KEY_DATE_FORMAT, DateFormatMode.AUTO),
+            vehiclePaintCustomArgb = preferences.getInt(KEY_VEHICLE_PAINT_CUSTOM, 0xFF2E7D5B.toInt()),
+            floorColorArgb = if (preferences.contains(KEY_FLOOR_COLOR)) preferences.getInt(KEY_FLOOR_COLOR, 0) else null,
         )
+
+        private inline fun <reified T : Enum<T>> SharedPreferences.enumValue(key: String, default: T): T =
+            runCatching { enumValueOf<T>(getString(key, null) ?: default.name) }.getOrDefault(default)
     }
 }

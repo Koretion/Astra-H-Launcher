@@ -20,7 +20,6 @@ internal const val VehicleStoppedArtworkScale = 1.6f
 internal const val VehicleStoppedRoadScale = 1.75f
 internal const val VehicleRoadCenterOffsetFraction = 0f
 internal const val VehicleStoppedArtworkLowering = 12f
-internal const val VehicleStoppedZoomDelayMs = 2_000L
 internal const val VehicleSceneAnimationDurationMs = 650
 internal const val IndicatorPulseHoldMs = 2_000L
 internal const val TrafficLightDisplayHoldMs = 6_000L

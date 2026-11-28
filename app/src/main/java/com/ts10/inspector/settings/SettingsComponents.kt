@@ -1,5 +1,13 @@
 package com.ts10.inspector.settings
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.BoxWithConstraints
 import com.ts10.inspector.R
@@ -163,17 +171,30 @@ internal fun Choice(text: String, selected: Boolean, layout: LauncherLayout, onC
     val colors = LocalDashboardColors.current
     Text(
         text,
-        color = if (selected) Color(0xFF2E9D50) else colors.muted,
+        color = if (selected) colors.primary else colors.muted,
         fontSize = layout.sp(9),
-        fontWeight = FontWeight.Bold,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         modifier = Modifier
             .padding(horizontal = layout.dp(2))
-            .background(colors.primary.copy(alpha = if (colors.dark) .08f else .05f), RoundedCornerShape(layout.dp(5)))
-            .border(layout.dp(1), if (selected) Color(0xFF2E9D50) else colors.muted.copy(alpha = .22f), RoundedCornerShape(layout.dp(5)))
+            .teslaButton(colors, layout, selected = selected)
             .clickable(onClick = onClick)
-            .padding(horizontal = layout.dp(9), vertical = layout.dp(6)),
+            .padding(horizontal = layout.dp(11), vertical = layout.dp(6)),
     )
 }
+
+/** Relleno común de todos los botones de Ajustes (estilo Tesla: gris plano, el elegido en blanco). */
+internal fun teslaButtonFill(colors: DashboardColors, selected: Boolean = false, enabled: Boolean = true): Color = when {
+    selected -> if (colors.dark) Color(0xFF3A3D42) else Color.White
+    !enabled -> colors.primary.copy(alpha = if (colors.dark) .04f else .03f)
+    else -> colors.primary.copy(alpha = if (colors.dark) .09f else .07f)
+}
+
+internal fun Modifier.teslaButton(
+    colors: DashboardColors,
+    layout: LauncherLayout,
+    selected: Boolean = false,
+    enabled: Boolean = true,
+): Modifier = background(teslaButtonFill(colors, selected, enabled), RoundedCornerShape(layout.dp(6)))
 
 internal fun Modifier.teslaControlSurface(
     colors: DashboardColors,
@@ -182,19 +203,10 @@ internal fun Modifier.teslaControlSurface(
     selected: Boolean = false,
     fillWidth: Boolean = true,
 ): Modifier {
-    val outline = when {
-        selected -> Color(0xFF2E9D50)
-        enabled -> colors.muted.copy(alpha = if (colors.dark) .28f else .22f)
-        else -> colors.muted.copy(alpha = .12f)
-    }
     val sized = if (fillWidth) fillMaxWidth() else this
     return sized
         .padding(vertical = layout.dp(3))
-        .background(
-            colors.primary.copy(alpha = if (enabled && colors.dark) .075f else if (enabled) .05f else .025f),
-            RoundedCornerShape(layout.dp(6)),
-        )
-        .border(layout.dp(1), outline, RoundedCornerShape(layout.dp(6)))
+        .teslaButton(colors, layout, selected = selected, enabled = enabled)
 }
 
 @Composable
@@ -207,8 +219,7 @@ internal fun TeslaStepButton(text: String, layout: LauncherLayout, onClick: () -
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .padding(horizontal = layout.dp(6))
-            .background(colors.primary.copy(alpha = if (colors.dark) .08f else .05f), RoundedCornerShape(layout.dp(4)))
-            .border(layout.dp(1), colors.muted.copy(alpha = .24f), RoundedCornerShape(layout.dp(4)))
+            .teslaButton(colors, layout)
             .clickable(onClick = onClick)
             .padding(horizontal = layout.dp(9), vertical = layout.dp(2)),
     )
@@ -217,23 +228,113 @@ internal fun TeslaStepButton(text: String, layout: LauncherLayout, onClick: () -
 @Composable
 internal fun <T> OptionChoices(title: String, options: List<T>, selected: T, label: (T) -> String, onSelected: (T) -> Unit, layout: LauncherLayout) {
     val colors = LocalDashboardColors.current
-    Column(modifier = Modifier.padding(vertical = layout.dp(8))) {
-        Text(title, color = colors.primary, fontSize = layout.sp(10), fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(layout.dp(3))) { options.forEach { option -> Choice(label(option), option == selected, layout) { onSelected(option) } } }
+    // Estilo Tesla: título a la izquierda y control segmentado a la derecha; con muchas opciones
+    // o textos largos, un desplegable.
+    Row(modifier = Modifier.padding(vertical = layout.dp(6)), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = colors.primary, fontSize = layout.sp(10), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).padding(end = layout.dp(8)))
+        if (needsDropdown(options, label)) DropdownSelector(options, selected, label, onSelected, layout)
+        else SegmentedControl(options, selected, label, onSelected, layout)
+    }
+}
+
+private fun <T> needsDropdown(options: List<T>, label: (T) -> String): Boolean =
+    options.size > MAX_SEGMENTS || options.sumOf { label(it).length } > MAX_SEGMENT_CHARS
+
+private const val MAX_SEGMENTS = 4
+private const val MAX_SEGMENT_CHARS = 30
+
+/** Botón con la opción actual y flecha; al pulsarlo abre la lista, como el idioma en Tesla. */
+@Composable
+internal fun <T> DropdownSelector(options: List<T>, selected: T, label: (T) -> String, onSelected: (T) -> Unit, layout: LauncherLayout) {
+    val colors = LocalDashboardColors.current
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .widthIn(min = layout.dp(130))
+                .teslaButton(colors, layout)
+                .clickable { expanded = true }
+                .padding(start = layout.dp(12), end = layout.dp(6), top = layout.dp(6), bottom = layout.dp(6)),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label(selected), color = colors.primary, fontSize = layout.sp(9), fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+            Icon(Icons.Outlined.KeyboardArrowDown, null, tint = colors.muted, modifier = Modifier.padding(start = layout.dp(6)).size(layout.dp(16)))
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(if (colors.dark) Color(0xFF2A2C30) else Color.White),
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            label(option),
+                            color = colors.primary,
+                            fontSize = layout.sp(9),
+                            fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelected(option)
+                    },
+                )
+            }
+        }
     }
 }
 
 /** Como [OptionChoices], pero salta de línea cuando las opciones no caben en una fila. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun <T> WrappedOptionChoices(title: String, options: List<T>, selected: T, label: (T) -> String, onSelected: (T) -> Unit, layout: LauncherLayout) {
+    if (needsDropdown(options, label)) {
+        OptionChoices(title, options, selected, label, onSelected, layout)
+        return
+    }
     val colors = LocalDashboardColors.current
-    Column(modifier = Modifier.padding(vertical = layout.dp(8))) {
-        Text(title, color = colors.primary, fontSize = layout.sp(10), fontWeight = FontWeight.Bold)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(layout.dp(3)),
-            verticalArrangement = Arrangement.spacedBy(layout.dp(5)),
-        ) { options.forEach { option -> Choice(label(option), option == selected, layout) { onSelected(option) } } }
+    Column(modifier = Modifier.padding(vertical = layout.dp(6))) {
+        Text(title, color = colors.primary, fontSize = layout.sp(10), fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = layout.dp(4)))
+        SegmentedControl(options, selected, label, onSelected, layout, wrap = true)
+    }
+}
+
+/** Pista gris con el segmento elegido resaltado, como los ajustes de Tesla. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun <T> SegmentedControl(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelected: (T) -> Unit,
+    layout: LauncherLayout,
+    wrap: Boolean = false,
+) {
+    val colors = LocalDashboardColors.current
+    val trackShape = RoundedCornerShape(layout.dp(7))
+    val segmentShape = RoundedCornerShape(layout.dp(5))
+    val track = Modifier
+        .background(teslaButtonFill(colors), trackShape)
+        .padding(layout.dp(2))
+    val segment: @Composable (T) -> Unit = { option ->
+        val active = option == selected
+        Text(
+            label(option),
+            color = if (active) colors.primary else colors.muted,
+            fontSize = layout.sp(9),
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier
+                .background(if (active) teslaButtonFill(colors, selected = true) else Color.Transparent, segmentShape)
+                .clickable { onSelected(option) }
+                .padding(horizontal = layout.dp(11), vertical = layout.dp(6)),
+        )
+    }
+    if (wrap) {
+        FlowRow(modifier = track, verticalArrangement = Arrangement.spacedBy(layout.dp(2))) { options.forEach { segment(it) } }
+    } else {
+        Row(modifier = track) { options.forEach { segment(it) } }
     }
 }
 

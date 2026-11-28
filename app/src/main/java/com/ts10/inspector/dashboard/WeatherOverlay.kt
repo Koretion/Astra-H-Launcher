@@ -1,5 +1,7 @@
 package com.ts10.inspector.dashboard
 
+import com.ts10.inspector.ui.DisplayFormats
+import com.ts10.inspector.ui.rememberDisplayFormats
 import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -51,6 +53,7 @@ internal fun WeatherOverlay(
 ) {
     val colors = LocalDashboardColors.current
     val weather = state.weatherDetails
+    val formats = rememberDisplayFormats()
 
     BoxWithConstraints(
         modifier = Modifier
@@ -118,7 +121,7 @@ internal fun WeatherOverlay(
                 )
                 Column(modifier = Modifier.padding(start = layout.dp(12)).weight(1f)) {
                     Text(
-                        text = state.outdoorTemperature,
+                        text = formats.temperatureLabel(state.outdoorTemperature),
                         color = colors.primary,
                         fontSize = layout.sp(30),
                         lineHeight = layout.sp(31),
@@ -131,7 +134,7 @@ internal fun WeatherOverlay(
                     )
                 }
                 Text(
-                    text = weather.updatedAtLabel()?.let { stringResource(R.string.weather_updated_at, it) }.orEmpty(),
+                    text = weather.updatedAtLabel(formats)?.let { stringResource(R.string.weather_updated_at, it) }.orEmpty(),
                     color = colors.muted,
                     fontSize = layout.sp(9),
                     textAlign = TextAlign.End,
@@ -152,7 +155,7 @@ internal fun WeatherOverlay(
                 WeatherMetric(
                     icon = Icons.Outlined.Air,
                     label = stringResource(R.string.weather_wind),
-                    value = weather.windSpeedKmh?.let { String.format(Locale.getDefault(), "%.0f km/h", it) } ?: "--",
+                    value = weather.windSpeedKmh?.let { formats.speedText(it) } ?: "--",
                     layout = layout,
                     modifier = Modifier.weight(1f),
                 )
@@ -160,7 +163,7 @@ internal fun WeatherOverlay(
                     icon = null,
                     label = stringResource(R.string.weather_feels_like),
                     value = weather.apparentTemperatureCelsius?.let {
-                        String.format(Locale.getDefault(), "%.0f°", it)
+                        formats.temperatureText(it, withUnit = false)
                     } ?: "--",
                     layout = layout,
                     modifier = Modifier.weight(1f),
@@ -184,6 +187,7 @@ internal fun WeatherOverlay(
                     ForecastDay(
                         day = day,
                         today = index == 0,
+                        formats = formats,
                         layout = layout,
                         modifier = Modifier.weight(1f),
                     )
@@ -230,6 +234,7 @@ private fun WeatherMetric(
 private fun ForecastDay(
     day: WeatherForecastDay,
     today: Boolean,
+    formats: DisplayFormats,
     layout: LauncherLayout,
     modifier: Modifier,
 ) {
@@ -254,7 +259,7 @@ private fun ForecastDay(
             modifier = Modifier.padding(top = layout.dp(4)).size(layout.dp(25)),
         )
         Text(
-            text = "${day.maximumCelsius.rounded()}°  ${day.minimumCelsius.rounded()}°",
+            text = "${formats.temperatureText(day.maximumCelsius, withUnit = false)}  ${formats.temperatureText(day.minimumCelsius, withUnit = false)}",
             color = colors.primary,
             fontSize = layout.sp(9),
             fontWeight = FontWeight.Bold,
@@ -292,11 +297,9 @@ private fun WeatherForecastDay.dayLabel(locale: Locale): String = runCatching {
         .uppercase(locale)
 }.getOrDefault(date.takeLast(5))
 
-private fun CurrentWeather.updatedAtLabel(): String? = runCatching {
-    Instant.ofEpochMilli(updatedAtMillis).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
+private fun CurrentWeather.updatedAtLabel(formats: DisplayFormats): String? = runCatching {
+    formats.time(Instant.ofEpochMilli(updatedAtMillis).atZone(ZoneId.systemDefault()))
 }.getOrNull()
-
-private fun Double.rounded(): String = String.format(Locale.getDefault(), "%.0f", this)
 
 internal inline fun weatherOverlayTitle(locationName: String?, generic: String, withCity: (String) -> String): String =
     locationName?.trim()?.takeIf(String::isNotEmpty)?.let(withCity) ?: generic

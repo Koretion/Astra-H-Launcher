@@ -33,7 +33,9 @@ import com.ts10.inspector.vehicle.estimateManualGear
 import com.ts10.inspector.vehicle.f1RpmBand
 import com.ts10.inspector.vehicle.f1RpmFill
 import com.ts10.inspector.vehicle.shouldRecommendEconomicUpshift
-import com.ts10.inspector.vehicle3d.VEHICLE_3D_DRIVING_KMH
+import com.ts10.inspector.vehicle3d.ParkedViewState
+import com.ts10.inspector.ui.DisplayFormats
+import com.ts10.inspector.ui.rememberDisplayFormats
 
 @Composable
 internal fun RuntimeSpeed(
@@ -50,10 +52,12 @@ internal fun RuntimeSpeed(
     } else {
         foreground
     }
-    Speed(state, layout, speedColor)
-    val parked3d = hideSpeedLimitWhenParked && state.speedKmh < VEHICLE_3D_DRIVING_KMH
+    val formats = rememberDisplayFormats()
+    Speed(state, formats, layout, speedColor)
+    val parkedView by ParkedViewState.parked.collectAsStateWithLifecycle()
+    val parked3d = hideSpeedLimitWhenParked && parkedView
     if (showSpeedLimit && speedLimit != null && !parked3d) {
-        SpeedLimitSign(speedLimit, layout, showPost = true)
+        SpeedLimitSign(formats.speedLimit(speedLimit), layout)
     }
 }
 
@@ -119,9 +123,9 @@ internal fun EconomicShiftIndicator(layout: LauncherLayout, colors: DashboardCol
 }
 
 @Composable
-private fun Speed(state: SpeedUiState, layout: LauncherLayout, foreground: Color) {
+private fun Speed(state: SpeedUiState, formats: DisplayFormats, layout: LauncherLayout, foreground: Color) {
     Text(
-        text = state.speedKmh.toString(),
+        text = formats.speed(state.speedKmh).toString(),
         color = foreground,
         fontSize = layout.sp(43),
         lineHeight = layout.sp(43),
@@ -130,7 +134,7 @@ private fun Speed(state: SpeedUiState, layout: LauncherLayout, foreground: Color
         modifier = Modifier.offset(layout.dp(8), layout.dp(45)).size(layout.dp(72), layout.dp(43)),
     )
     Text(
-        text = "km/h",
+        text = formats.speedUnit.label,
         color = foreground,
         fontSize = layout.sp(14),
         textAlign = TextAlign.Center,
@@ -139,7 +143,7 @@ private fun Speed(state: SpeedUiState, layout: LauncherLayout, foreground: Color
 }
 
 @Composable
-private fun SpeedLimitSign(limit: Int, layout: LauncherLayout, showPost: Boolean) {
+private fun SpeedLimitSign(limit: Int, layout: LauncherLayout) {
     Box(
         modifier = Modifier.offset(layout.dp(18), layout.dp(169)).size(layout.dp(43))
             .background(Color.White, CircleShape).border(layout.dp(4), Color(0xFFD71920), CircleShape),
@@ -152,11 +156,6 @@ private fun SpeedLimitSign(limit: Int, layout: LauncherLayout, showPost: Boolean
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
-    }
-    if (showPost) {
-        Canvas(Modifier.offset(layout.dp(37), layout.dp(211)).size(layout.dp(5), layout.dp(48))) {
-            drawLine(Color(0xFF8A8A88), Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), size.width * .55f)
-        }
     }
 }
 

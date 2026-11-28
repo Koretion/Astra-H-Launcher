@@ -73,6 +73,7 @@ import com.ts10.inspector.vision.LaneChangeEstimator
 import com.ts10.inspector.vision.RoadObjectKind
 import com.ts10.inspector.vision.TrackedRoadObject
 import com.ts10.inspector.vision.TrafficLightColor
+import com.ts10.inspector.vehicle3d.ParkedViewState
 import com.ts10.inspector.vision.resolveRenderedRoadCurve
 import com.ts10.inspector.vision.roadCurveFromLane
 import com.ts10.inspector.vision.roadCurveFromSteering
@@ -271,19 +272,14 @@ private fun VehicleView(
     val rightDoorOpenImage = ImageBitmap.imageResource(artworkResources.rightDoorOpen)
     val frontLightsImage = ImageBitmap.imageResource(R.drawable.vehicle_front_lights)
     val rearLightsImage = ImageBitmap.imageResource(R.drawable.vehicle_rear_lights)
-    var movingVisual by remember { mutableStateOf(false) }
+    val parkedView by ParkedViewState.parked.collectAsStateWithLifecycle()
+    val movingVisual = !parkedView
     var automaticDrivingScale by remember(drivingZoomMode) {
         mutableStateOf(DashboardDrivingZoomMode.STANDARD_1X.sceneScale)
     }
     LaunchedEffect(state.speedKmh, drivingZoomMode) {
-        if (state.speedKmh > 0) {
-            movingVisual = true
-            if (drivingZoomMode == DashboardDrivingZoomMode.AUTOMATIC_1X_2X) {
-                automaticDrivingScale = drivingZoomMode.sceneScaleForSpeed(state.speedKmh)
-            }
-        } else {
-            delay(VehicleStoppedZoomDelayMs)
-            if (state.speedKmh == 0) movingVisual = false
+        if (state.speedKmh > 0 && drivingZoomMode == DashboardDrivingZoomMode.AUTOMATIC_1X_2X) {
+            automaticDrivingScale = drivingZoomMode.sceneScaleForSpeed(state.speedKmh)
         }
     }
     val stoppedProgress by animateFloatAsState(

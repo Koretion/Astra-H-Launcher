@@ -60,6 +60,15 @@ internal object Vehicle3dOffscreenEngine {
     private const val WIDTH = Vehicle3dFrame.WIDTH
     private const val HEIGHT = Vehicle3dFrame.HEIGHT
     private const val FRAME_INTERVAL_MS = 50L
+    /**
+     * Parte máxima del tiempo que el 3D puede tener ocupada la GPU. En la TS10 un fotograma tarda
+     * ~55 ms: encadenarlos sin pausa dejaba la GPU al 100 % y Waze, Spotify y la barra de QF
+     * (SystemUI) tardaban en dibujar o se quedaban en blanco.
+     */
+    private const val MAX_GPU_DUTY = 0.6f
+    /** Cadencia reducida mientras arranca una app en el panel derecho. */
+    private const val YIELD_INTERVAL_MS = 250L
+    private const val YIELD_DURATION_MS = 6_000L
     /** Caps how far ahead the indicator phase is judged when one frame was unusually slow. */
     private const val MAX_LAMP_LEAD_MS = 150L
     private const val STATS_WINDOW_MS = 60_000L
@@ -78,6 +87,13 @@ internal object Vehicle3dOffscreenEngine {
     private var loopScheduled = false
     private var lastTickMs = 0L
     private var frameNumber = 0L
+    @Volatile private var yieldUntilMs = 0L
+
+    /** Baja el 3D a ~4 fps unos segundos para que otra app pueda arrancar con la GPU libre. */
+    fun yieldGpu(durationMs: Long = YIELD_DURATION_MS) {
+        yieldUntilMs = SystemClock.uptimeMillis() + durationMs
+        TelemetryLog.event("VEHICLE_3D_OFFSCREEN", "gpu yield ${durationMs}ms")
+    }
     private var lastRenderMs = 0L
     private val samples = ArrayDeque<FrameSample>()
     private var lastFrameStartedMs = 0L
@@ -256,11 +272,16 @@ internal object Vehicle3dOffscreenEngine {
             }
         }
         if (animating) {
-            // Cadencia fija: el intervalo se cuenta desde el inicio de este fotograma, no desde que
-            // termina el render; si el render lo supera, el siguiente se encadena sin espera.
-            var delay = (FRAME_INTERVAL_MS - (SystemClock.uptimeMillis() - now)).coerceAtLeast(0L)
-            // With the indicators on, also wake right before the real lamps switch.
-            if (current.leftIndicator || current.rightIndicator) {
+            // Cadencia fija contada desde el inicio de este fotograma, pero sin pasar de
+            // MAX_GPU_DUTY: si el render es lento se espera lo necesario para dejar GPU libre.
+            val busyMs = SystemClock.uptimeMillis() - now
+            val interval = maxOf(FRAME_INTERVAL_MS, (busyMs / MAX_GPU_DUTY).toLong())
+            var delay = (interval - busyMs).coerceAtLeast(0L)
+            val yielding = SystemClock.uptimeMillis() < yieldUntilMs
+            if (yielding) {
+                delay = maxOf(delay, YIELD_INTERVAL_MS - busyMs)
+            } else if (current.leftIndicator || current.rightIndicator) {
+                // With the indicators on, also wake right before the real lamps switch.
                 val untilSwitch = TurnSignalFlash.msUntilChange(SystemClock.elapsedRealtime() + lastRenderMs)
                 delay = minOf(delay, untilSwitch)
             }

@@ -1,5 +1,6 @@
 package com.ts10.inspector.dashboard
 
+import com.ts10.inspector.ui.rememberDisplayFormats
 import com.ts10.inspector.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
@@ -42,7 +43,8 @@ internal fun RuntimeClockAndWeather(
 ) {
     val state by LauncherRuntime.weatherState.collectAsStateWithLifecycle()
     val clock = rememberSystemClock()
-    ClockAndWeather(state, clock, layout, colors, onWeather)
+    val formats = rememberDisplayFormats()
+    ClockAndWeather(state.copy(outdoorTemperature = formats.temperatureLabel(state.outdoorTemperature)), clock, layout, colors, onWeather)
 }
 
 @Composable

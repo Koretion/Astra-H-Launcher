@@ -89,6 +89,12 @@ internal class OffscreenGlesRenderer(
     private val sPosition: Int
     private val sStrength: Int
     private val floorProgram: Int
+    private val studioProgram: Int
+    private val stViewProj: Int
+    private val stPosition: Int
+    private val stWall: Int
+    private val stStrength: Int
+    private val stHorizon: Int
     private val fViewProj: Int
     private val fPosition: Int
     private val fBackground: Int
@@ -147,6 +153,12 @@ internal class OffscreenGlesRenderer(
         program = linkProgram(VERTEX_SHADER, FRAGMENT_SHADER)
         shadowProgram = linkProgram(SHADOW_VERTEX_SHADER, SHADOW_FRAGMENT_SHADER)
         floorProgram = linkProgram(SHADOW_VERTEX_SHADER, FLOOR_FRAGMENT_SHADER)
+        studioProgram = linkProgram(SHADOW_VERTEX_SHADER, STUDIO_FRAGMENT_SHADER)
+        stViewProj = GLES20.glGetUniformLocation(studioProgram, "uViewProj")
+        stPosition = GLES20.glGetAttribLocation(studioProgram, "aPosition")
+        stWall = GLES20.glGetUniformLocation(studioProgram, "uWall")
+        stStrength = GLES20.glGetUniformLocation(studioProgram, "uStrength")
+        stHorizon = GLES20.glGetUniformLocation(studioProgram, "uHorizon")
         roadProgram = linkProgram(ROAD_VERTEX_SHADER, ROAD_FRAGMENT_SHADER)
         poolProgram = linkProgram(SHADOW_VERTEX_SHADER, POOL_FRAGMENT_SHADER)
         beamProgram = linkProgram(BEAM_VERTEX_SHADER, BEAM_FRAGMENT_SHADER)
@@ -381,6 +393,27 @@ internal class OffscreenGlesRenderer(
      * Cielo de atardecer en franjas horizontales limpiadas con tijera: un degradado sin shader.
      * [blend] mezcla desde el color de fondo para que entre poco a poco.
      */
+    /** Pared del estudio a pantalla completa, mezclada con alfa sobre el fondo ya borrado. */
+    private fun drawStudio(wall: FloatArray, strength: Float) {
+        if (strength <= 0f) return
+        GLES20.glUseProgram(studioProgram)
+        GLES20.glUniformMatrix4fv(stViewProj, 1, false, Mat4.identity(), 0)
+        GLES20.glUniform3fv(stWall, 1, wall, 0)
+        GLES20.glUniform1f(stStrength, strength)
+        GLES20.glUniform1f(stHorizon, STUDIO_HORIZON)
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA, GLES20.GL_ZERO, GLES20.GL_ONE)
+        shadowQuad.position(0)
+        GLES20.glEnableVertexAttribArray(stPosition)
+        GLES20.glVertexAttribPointer(stPosition, 2, GLES20.GL_FLOAT, false, 0, shadowQuad)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6)
+        GLES20.glDisableVertexAttribArray(stPosition)
+        GLES20.glDisable(GLES20.GL_BLEND)
+        GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+    }
+
     private fun clearSunset(rows: Int, background: FloatArray, blend: Float) {
         GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
         val bands = SUNSET_BANDS
@@ -441,7 +474,12 @@ internal class OffscreenGlesRenderer(
         // pasa de 30° fuera a 74° dentro).
         val cabinBlend = ((animator.orbit.fovDegrees - DEFAULT_FOV_DEGREES) / (CABIN_FOV_DEGREES - DEFAULT_FOV_DEGREES))
             .coerceIn(0f, 1f)
+        val showroomFloor = input.floorArgb?.let { customFloor(it, input.dark) } ?: if (input.dark) DARK_FLOOR else LIGHT_FLOOR
         if (input.dark && !input.topView && cabinBlend > 0f) clearSunset(viewportHeight, background, cabinBlend)
+        if (!input.topView && showroom > 0f) {
+            // La pared es siempre neutra aunque el suelo tenga color.
+            drawStudio(studioWall(if (input.dark) DARK_FLOOR else LIGHT_FLOOR, background, input.dark), showroom * (1f - cabinBlend))
+        }
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_CULL_FACE) // Blender meshes are double sided.
 
@@ -465,7 +503,6 @@ internal class OffscreenGlesRenderer(
             Mat4.lookAt(eye, target),
         )
 
-        val showroomFloor = if (input.dark) DARK_FLOOR else LIGHT_FLOOR
         // While driving the floor spot fades into the background and the road takes its place.
         val floor = FloatArray(3) { background[it] + (showroomFloor[it] - background[it]) * showroom }
         if (!input.topView && showroom > 0f) drawFloor(viewProj, background, floor)
@@ -569,7 +606,7 @@ internal class OffscreenGlesRenderer(
         GLES20.glUniform1f(uFloorY, groundY)
         GLES20.glUniform1f(uReflect, reflection)
         GLES20.glUniform1f(uFadeHeight, halfExtents[1] * REFLECTION_DEPTH)
-        GLES20.glUniform1f(uFadeBottom, height * BOTTOM_FADE)
+        GLES20.glUniform1f(uFadeBottom, height * FLOOR_BOTTOM_FADE)
         GLES20.glUniform3fv(uCabinMin, 1, CABIN_MIN, 0)
         GLES20.glUniform3fv(uCabinMax, 1, CABIN_MAX, 0)
         GLES20.glUniform3fv(uBackground, 1, background, 0)
@@ -584,7 +621,13 @@ internal class OffscreenGlesRenderer(
         // Mirror about the ground plane y = groundY.
         val mirror = if (mirrored) Mat4.identity().also { it[5] = -1f; it[13] = 2f * groundY } else null
         val blended = ArrayList<Triple<FloatArray, GlbPrimitive, Boolean>>()
-        GLES20.glDisable(GLES20.GL_BLEND)
+        // El reflejo se mezcla con alfa sobre el suelo; el coche real es opaco.
+        if (mirrored) {
+            GLES20.glEnable(GLES20.GL_BLEND)
+            GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA, GLES20.GL_ZERO, GLES20.GL_ONE)
+        } else {
+            GLES20.glDisable(GLES20.GL_BLEND)
+        }
         GLES20.glDepthMask(true)
         traverse(motions, litLights) { local, primitive, lamp ->
             val world = mirror?.let { Mat4.multiply(it, local) } ?: local
@@ -617,8 +660,10 @@ internal class OffscreenGlesRenderer(
         GLES20.glUniformMatrix4fv(fViewProj, 1, false, Mat4.multiply(viewProj, model), 0)
         GLES20.glUniform3fv(fBackground, 1, background, 0)
         GLES20.glUniform3fv(fFloor, 1, floor, 0)
-        GLES20.glUniform1f(fFadeBottom, height * BOTTOM_FADE)
+        GLES20.glUniform1f(fFadeBottom, height * FLOOR_BOTTOM_FADE)
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA, GLES20.GL_ZERO, GLES20.GL_ONE)
         // Not written to depth: the mirrored car below the plane must stay visible through it.
         GLES20.glDepthMask(false)
         shadowQuad.position(0)
@@ -627,6 +672,7 @@ internal class OffscreenGlesRenderer(
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6)
         GLES20.glDisableVertexAttribArray(fPosition)
         GLES20.glDepthMask(true)
+        GLES20.glDisable(GLES20.GL_BLEND)
     }
 
     private fun draw(
@@ -808,11 +854,11 @@ internal class OffscreenGlesRenderer(
         val front = lamps.frontZ
         val rear = lamps.rearZ
         val pools = buildList {
-            if (input.dippedBeam || input.highBeam) add(LightPool(front - 5.5f, 2.6f, 5.2f, HEADLAMP_COLOR, 0.42f))
-            if (input.highBeam) add(LightPool(front - 13f, 3.2f, 10f, HEADLAMP_COLOR, 0.3f))
-            if (input.frontFog) add(LightPool(front - 2.6f, 3.6f, 2.4f, FOG_COLOR, 0.38f))
+            if (input.dippedBeam || input.highBeam) add(LightPool(front - 5.5f, 2.8f, 5.6f, HEADLAMP_COLOR, 0.7f))
+            if (input.highBeam) add(LightPool(front - 13f, 3.4f, 10f, HEADLAMP_COLOR, 0.5f))
+            if (input.frontFog) add(LightPool(front - 2.6f, 3.6f, 2.4f, FOG_COLOR, 0.55f))
             if (input.positionLights || input.dippedBeam || input.highBeam) {
-                add(LightPool(rear + 0.7f, 1.3f, 0.8f, TAIL_COLOR, 0.16f))
+                add(LightPool(rear + 0.7f, 1.3f, 0.8f, TAIL_COLOR, 0.28f))
             }
             if (input.brake) add(LightPool(rear + 1.0f, 1.6f, 1.2f, TAIL_COLOR, 0.34f))
             if (input.rearFog) add(LightPool(rear + 1.3f, 1.0f, 1.8f, TAIL_COLOR, 0.42f))
@@ -923,13 +969,13 @@ internal class OffscreenGlesRenderer(
         GLES20.glUseProgram(shadowProgram)
         // The quad's local (x, y) maps to world (x, z) on the ground plane.
         val model = FloatArray(16).also {
-            it[0] = halfExtents[0] * 1.25f
-            it[6] = halfExtents[2] * 1.12f
+            it[0] = halfExtents[0] * 1.15f
+            it[6] = halfExtents[2] * 1.05f
             it[9] = 1f
             it[12] = center[0]; it[13] = groundY + 0.004f; it[14] = center[2]; it[15] = 1f
         }
         GLES20.glUniformMatrix4fv(sViewProj, 1, false, Mat4.multiply(viewProj, model), 0)
-        GLES20.glUniform1f(sStrength, if (dark) 0.75f else 0.35f)
+        GLES20.glUniform1f(sStrength, if (dark) 0.8f else 0.42f)
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFuncSeparate(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA, GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
@@ -951,6 +997,7 @@ internal class OffscreenGlesRenderer(
         GLES20.glDeleteProgram(program)
         GLES20.glDeleteProgram(shadowProgram)
         GLES20.glDeleteProgram(floorProgram)
+        GLES20.glDeleteProgram(studioProgram)
         GLES20.glDeleteProgram(roadProgram)
         GLES20.glDeleteProgram(boxProgram)
         GLES20.glDeleteProgram(poolProgram)
@@ -972,11 +1019,11 @@ internal class OffscreenGlesRenderer(
         const val READER_MAX_IMAGES = 5
         const val HELD_FRAMES = 3
         const val ACQUIRE_RETRIES = 20
-        const val LAMP_EMISSIVE_GAIN = 3.2f
+        const val LAMP_EMISSIVE_GAIN = 5.5f
         const val THIRD_BRAKE_HALO_WIDTH = 0.42f
         const val THIRD_BRAKE_HALO_HEIGHT = 0.12f
         const val MIRRORED_BEAM = 0.7f
-        const val LIGHT_THEME_GAIN = 0.35f
+        const val LIGHT_THEME_GAIN = 0.6f
         val HEADLAMP_COLOR = floatArrayOf(1f, 0.94f, 0.82f)
         val FOG_COLOR = floatArrayOf(1f, 0.92f, 0.72f)
         val TAIL_COLOR = floatArrayOf(1f, 0.08f, 0.06f)
@@ -1019,12 +1066,21 @@ internal class OffscreenGlesRenderer(
         val LIGHT_SKY = floatArrayOf(0.95f, 0.97f, 1f)
         val LIGHT_GROUND = floatArrayOf(0.35f, 0.35f, 0.37f)
         // sRGB floor colour at the centre of the spot (the background colour is reached at its edge).
-        val DARK_FLOOR = floatArrayOf(0.15f, 0.155f, 0.17f)
+        val DARK_FLOOR = floatArrayOf(0.2f, 0.205f, 0.225f)
         val LIGHT_FLOOR = floatArrayOf(1f, 1f, 1f)
-        const val DARK_REFLECTION = 0.34f
-        const val LIGHT_REFLECTION = 0.26f
-        const val FLOOR_RADIUS_X = 1.7f
-        const val FLOOR_RADIUS_Z = 2.1f
+        const val DARK_REFLECTION = 0.46f
+        const val LIGHT_REFLECTION = 0.34f
+        const val CUSTOM_FLOOR_DARK = 0.28f
+        const val CUSTOM_FLOOR_LIGHT = 0.3f
+        /** Disco de exposición, circular, algo mayor que el coche. */
+        const val FLOOR_RADIUS_X = 0.98f
+        const val FLOOR_RADIUS_Z = 0.98f
+        /** El disco solo se suaviza en la última franja inferior de la imagen. */
+        const val FLOOR_BOTTOM_FADE = 0.08f
+        /** Altura (0 arriba, 1 abajo) donde la pared del estudio alcanza su tono más claro. */
+        const val STUDIO_HORIZON = 0.55f
+        const val STUDIO_WALL_DARK = 0.45f
+        const val STUDIO_WALL_LIGHT = 0.9f
         const val REFLECTION_MAX_PITCH = 55f
         const val REFLECTION_FADE_DEGREES = 20f
         /** Mirrored depth (in car half-heights) over which the reflection fades out. */
@@ -1038,6 +1094,20 @@ internal class OffscreenGlesRenderer(
          */
         val CABIN_MIN = floatArrayOf(-0.70f, 0.30f, -1.00f)
         val CABIN_MAX = floatArrayOf(0.70f, 1.35f, 1.45f)
+
+        /**
+         * Suelo elegido por el usuario (sRGB): en tema oscuro se atenúa para que el coche siga
+         * destacando; en claro se aclara hacia blanco como el suelo de estudio.
+         */
+        /** Pared del estudio: algo más clara que el panel en oscuro y algo más gris que el suelo en claro. */
+        fun studioWall(floor: FloatArray, background: FloatArray, dark: Boolean): FloatArray = FloatArray(3) {
+            if (dark) background[it] + (floor[it] - background[it]) * STUDIO_WALL_DARK else floor[it] * STUDIO_WALL_LIGHT
+        }
+
+        fun customFloor(argb: Int, dark: Boolean): FloatArray = FloatArray(3) { i ->
+            val c = ((argb shr (16 - 8 * i)) and 0xFF) / 255f
+            if (dark) c * CUSTOM_FLOOR_DARK else 1f - (1f - c) * CUSTOM_FLOOR_LIGHT
+        }
 
         fun srgbToLinear(argb: Int): FloatArray = floatArrayOf(
             channel(argb shr 16), channel(argb shr 8), channel(argb),

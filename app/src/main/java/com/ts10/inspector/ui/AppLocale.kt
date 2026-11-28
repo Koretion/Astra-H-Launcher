@@ -24,6 +24,8 @@ enum class AppLanguage(val tag: String?, val nativeName: String) {
     FR("fr", "Français"),
     IT("it", "Italiano"),
     PT("pt", "Português"),
+    NL("nl", "Nederlands"),
+    PL("pl", "Polski"),
 }
 
 /**

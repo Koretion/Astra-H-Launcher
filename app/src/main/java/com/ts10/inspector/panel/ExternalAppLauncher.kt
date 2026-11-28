@@ -38,6 +38,8 @@ internal fun launchApplicationInContentArea(
     allowWazeTaskReset: Boolean = true,
 ): Boolean {
     if (supersedePendingLaunches) LauncherStartupCoordinator.userTookControl()
+    // La app que arranca en el panel (Spotify, radio, Waze) necesita la GPU para su primer dibujo.
+    com.ts10.inspector.vehicle3d.Vehicle3dOffscreenEngine.yieldGpu()
     TelemetryLog.event(
         "EXTERNAL_APP",
         "panel launch requested package=$packageName class=${activityClassName ?: "default"} " +

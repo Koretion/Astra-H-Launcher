@@ -13,8 +13,12 @@ import kotlin.math.sqrt
 internal data class Vehicle3dSceneInput(
     /** sRGB paint colour (ARGB) chosen by the user. */
     val paintArgb: Int = 0xFFE7E9EC.toInt(),
+    /** Color del suelo del showroom elegido por el usuario; null usa el suelo de estudio. */
+    val floorArgb: Int? = null,
     val dark: Boolean = true,
     val speedKmh: Float = 0f,
+    /** Vista de marcha; se mantiene unos segundos tras detenerse, ver [ParkedViewDebouncer]. */
+    val drivingView: Boolean = speedKmh >= VEHICLE_3D_DRIVING_KMH,
     /** Steering-wheel angle, positive to the left (counter-clockwise). */
     val steeringWheelDegrees: Float = 0f,
     val doorLeftOpen: Boolean = false,
@@ -151,7 +155,7 @@ internal fun vehicle3dCameraTarget(input: Vehicle3dSceneInput): Vehicle3dOrbit =
         distanceFactor = DRIVING_DISTANCE / input.drivingZoom,
         lateralMeters = input.roadCurve * DRIVING_CURVE_SHIFT_METERS,
     )
-    input.speedKmh >= VEHICLE_3D_DRIVING_KMH -> Vehicle3dOrbit(0f, 20f, DRIVING_DISTANCE / input.drivingZoom)
+    input.drivingView -> Vehicle3dOrbit(0f, 20f, DRIVING_DISTANCE / input.drivingZoom)
     input.reverse -> Vehicle3dOrbit(0f, 20f, DRIVING_DISTANCE)
     // Engine bay from the front and above, with the bonnet opened by the caller.
     input.focus == Vehicle3dFocus.ENGINE -> Vehicle3dOrbit(180f, 40f, 0.42f, targetY = 0.1f, targetZ = -0.62f)
@@ -190,7 +194,7 @@ internal const val VEHICLE_3D_DRIVING_KMH = 3f
 
 /** The road replaces the showroom floor only while driving forwards with the rear camera. */
 internal fun vehicle3dRoadMode(input: Vehicle3dSceneInput): Boolean =
-    !input.topView && input.speedKmh >= VEHICLE_3D_DRIVING_KMH
+    !input.topView && input.drivingView
 
 /** Time-based state that turns [Vehicle3dSceneInput] into node motions. Not thread-safe. */
 internal class Vehicle3dSceneAnimator {

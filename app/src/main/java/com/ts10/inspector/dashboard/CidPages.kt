@@ -1,5 +1,6 @@
 package com.ts10.inspector.dashboard
 
+import com.ts10.inspector.ui.rememberDisplayFormats
 import com.ts10.inspector.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
@@ -56,6 +57,7 @@ import java.util.Locale
 
 @Composable
 internal fun TripCidPage(layout: LauncherLayout, colors: DashboardColors) {
+    val formats = rememberDisplayFormats()
     val mileage by VehicleMileageTracker.state.collectAsStateWithLifecycle()
     var now by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
     LaunchedEffect(mileage.currentTripActive, mileage.currentTripStartedElapsedMs) {
@@ -69,14 +71,14 @@ internal fun TripCidPage(layout: LauncherLayout, colors: DashboardColors) {
     val elapsedMs = (tripEnd - mileage.currentTripStartedElapsedMs).coerceAtLeast(0L)
     CidPageFrame(stringResource(R.string.cid_trip), layout, colors) {
         CidPrimaryMetric(
-            mileage.vehicleOdometerKm?.let { String.format(java.util.Locale.getDefault(), "%.0f", it) } ?: "--",
+            mileage.vehicleOdometerKm?.let { String.format(java.util.Locale.getDefault(), "%.0f", formats.distance(it)) } ?: "--",
             stringResource(R.string.cid_odometer),
             layout,
             colors,
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             CidSecondaryMetric(
-                String.format(java.util.Locale.getDefault(), "%.1f km", mileage.currentTripKm),
+                formats.distanceText(mileage.currentTripKm),
                 stringResource(R.string.cid_this_trip),
                 layout,
                 colors,
@@ -91,17 +93,18 @@ internal fun EnergyCidPage(layout: LauncherLayout, colors: DashboardColors) {
     val fuel by FuelRangeEstimator.state.collectAsStateWithLifecycle()
     val signals by VehicleSignalHub.state.collectAsStateWithLifecycle()
     val launcher by LauncherRuntime.state.collectAsStateWithLifecycle()
+    val formats = rememberDisplayFormats()
     val fuelRate = signals.fuelRateLitersPerHour?.value
     val instantConsumption = calculateConsumptionLitersPer100Km(fuelRate, launcher.speedKmh)
     val consumptionValue = instantConsumption?.let {
-        String.format(java.util.Locale.getDefault(), "%.1f", it)
+        String.format(java.util.Locale.getDefault(), "%.1f", formats.consumption(it.toFloat()))
     } ?: fuelRate?.let {
         String.format(java.util.Locale.getDefault(), "%.2f", it)
     } ?: "--"
-    val consumptionUnit = if (instantConsumption != null) stringResource(R.string.cid_consumption_instant) else stringResource(R.string.cid_consumption_idle)
+    val consumptionUnit = if (instantConsumption != null) formats.unitText(stringResource(R.string.cid_consumption_instant)) else stringResource(R.string.cid_consumption_idle)
     CidPageFrame(stringResource(R.string.cid_range_engine), layout, colors) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            CidSecondaryMetric(fuel.rangeKm?.let { "$it km" } ?: "--", stringResource(R.string.cid_range), layout, colors)
+            CidSecondaryMetric(fuel.rangeKm?.let { formats.distanceText(it, 0) } ?: "--", stringResource(R.string.cid_range), layout, colors)
             CidSecondaryMetric(
                 consumptionValue,
                 consumptionUnit,
@@ -117,14 +120,14 @@ internal fun EnergyCidPage(layout: LauncherLayout, colors: DashboardColors) {
                 colors,
             )
             CidSecondaryMetric(
-                signals.coolantCelsius?.let { "${it.value} °C" } ?: "--",
+                signals.coolantCelsius?.let { formats.temperatureText(it.value) } ?: "--",
                 stringResource(R.string.cid_coolant),
                 layout,
                 colors,
             )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            CidSecondaryMetric(launcher.outdoorTemperature, stringResource(R.string.cid_outside), layout, colors)
+            CidSecondaryMetric(formats.temperatureLabel(launcher.outdoorTemperature), stringResource(R.string.cid_outside), layout, colors)
             CidSecondaryMetric(
                 signals.batteryVoltage?.let { String.format(java.util.Locale.getDefault(), "%.1f V", it.value) } ?: "--",
                 stringResource(R.string.cid_battery),

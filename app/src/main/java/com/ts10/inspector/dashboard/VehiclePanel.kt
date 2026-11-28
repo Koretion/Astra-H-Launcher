@@ -41,17 +41,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ts10.inspector.R
 import com.ts10.inspector.diagnostics.VolumeInteractionDiagnostics
 import com.ts10.inspector.launcher.LauncherActions
-import com.ts10.inspector.launcher.LauncherRuntime
 import com.ts10.inspector.panel.rememberInstalledApplications
 import com.ts10.inspector.settings.DashboardPreferences
 import com.ts10.inspector.ui.DashboardAssetIcon
 import com.ts10.inspector.ui.DashboardColors
 import com.ts10.inspector.ui.LauncherLayout
 import com.ts10.inspector.ui.LocalDashboardColors
-import com.ts10.inspector.vehicle3d.VEHICLE_3D_DRIVING_KMH
+import com.ts10.inspector.vehicle3d.ParkedViewState
 import com.ts10.inspector.vehicle3d.Vehicle3dOffscreenEngine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -72,9 +69,7 @@ internal fun VehiclePanel(
     )
     val vehiclePage = vehiclePager.currentPage % VEHICLE_PAGES
     val requestedFocus by VehicleSceneFocusRequest.focus.collectAsStateWithLifecycle()
-    val parked by remember {
-        LauncherRuntime.state.map { it.speedKmh < VEHICLE_3D_DRIVING_KMH }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(true)
+    val parked by ParkedViewState.parked.collectAsStateWithLifecycle()
     val sceneFocus = if (parked) requestedFocus else VehicleSceneFocus.NONE
     // Las vistas de Ajustes que mueven la cámara 3D (motor, interior, combustible) llevan a la
     // primera página, donde está el coche; neumáticos lleva a la suya. Al cerrar Ajustes se vuelve
@@ -105,7 +100,8 @@ internal fun VehiclePanel(
     }
     if (offscreen3d) {
         Vehicle3dSceneFeeder(
-            paintArgb = settings.vehiclePaint.argb ?: colors.primary.toArgb(),
+            paintArgb = settings.vehiclePaintArgb(colors.primary.toArgb()),
+            floorArgb = settings.floorColorArgb,
             dark = colors.dark,
             topView = vehiclePage == TIRE_PAGE,
             focus = sceneFocus,

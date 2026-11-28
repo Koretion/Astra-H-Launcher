@@ -1,5 +1,6 @@
 package com.ts10.inspector.settings
 
+import com.ts10.inspector.ui.rememberDisplayFormats
 import com.ts10.inspector.ui.text
 import com.ts10.inspector.R
 import androidx.compose.ui.res.stringResource
@@ -33,6 +34,7 @@ import java.util.Locale
 
 @Composable
 internal fun TpmsSection(layout: LauncherLayout, width: Float, height: Float) {
+    val formats = rememberDisplayFormats()
     val context = LocalContext.current
     val preferences = remember(context) { TpmsPressurePreferences.get(context) }
     val pressure by preferences.state.collectAsStateWithLifecycle()
@@ -50,7 +52,7 @@ internal fun TpmsSection(layout: LauncherLayout, width: Float, height: Float) {
                         Locale.getDefault(),
                         "%.1f bar  /  %s",
                         sensor.pressureBar,
-                        sensor.temperatureCelsius?.let { "%.0f °C".format(Locale.getDefault(), it) } ?: "-- °C",
+                        formats.temperatureText(sensor.temperatureCelsius),
                     )
                     wheelSpeed != null -> String.format(Locale.getDefault(), "%.1f km/h", wheelSpeed)
                     else -> "--"
@@ -71,9 +73,13 @@ internal fun TpmsSection(layout: LauncherLayout, width: Float, height: Float) {
         item { SettingsCard(layout, width) {
             Text(stringResource(R.string.tpms_source), color = LocalDashboardColors.current.muted, fontSize = layout.sp(8), fontWeight = FontWeight.Bold)
             Row(modifier = Modifier.padding(top = layout.dp(5))) {
-                Choice("AUTO", monitoring.mode == TireMonitoringMode.AUTO, layout) { TireMonitoringRepository.setMode(TireMonitoringMode.AUTO) }
-                Choice("USB TPMS", monitoring.mode == TireMonitoringMode.USB, layout) { TireMonitoringRepository.setMode(TireMonitoringMode.USB) }
-                Choice("DDS", monitoring.mode == TireMonitoringMode.DDS, layout) { TireMonitoringRepository.setMode(TireMonitoringMode.DDS) }
+                SegmentedControl(
+                    listOf(TireMonitoringMode.AUTO, TireMonitoringMode.USB, TireMonitoringMode.DDS),
+                    monitoring.mode,
+                    { mode -> when (mode) { TireMonitoringMode.AUTO -> "AUTO"; TireMonitoringMode.USB -> "USB TPMS"; else -> "DDS" } },
+                    { mode -> TireMonitoringRepository.setMode(mode) },
+                    layout,
+                )
             }
             MetricRow(
                 stringResource(R.string.tpms_usb_receiver),

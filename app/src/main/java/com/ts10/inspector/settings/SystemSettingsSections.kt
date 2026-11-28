@@ -1,5 +1,6 @@
 package com.ts10.inspector.settings
 
+import com.ts10.inspector.ui.rememberDisplayFormats
 import com.ts10.inspector.diagnostics.RootDetectionStatus
 import com.ts10.inspector.ui.text
 import androidx.annotation.StringRes
@@ -148,6 +149,25 @@ internal fun DisplaySection(layout: LauncherLayout, width: Float, height: Float)
             SectionHint(stringResource(R.string.settings_language_hint), layout)
         }
         item { ThemeModeRowCompact(settings.themeMode, preferences::setThemeMode, layout) }
+        item { OptionChoices(stringResource(R.string.display_speed_unit), SpeedUnit.entries, settings.speedUnit, { it.label }, preferences::setSpeedUnit, layout) }
+        item { OptionChoices(stringResource(R.string.display_temperature_unit), TemperatureUnit.entries, settings.temperatureUnit, { it.label }, preferences::setTemperatureUnit, layout) }
+        item {
+            val labels = mapOf(
+                TimeFormatMode.AUTO to autoLabel,
+                TimeFormatMode.H12 to stringResource(R.string.display_time_12h),
+                TimeFormatMode.H24 to stringResource(R.string.display_time_24h),
+            )
+            OptionChoices(stringResource(R.string.display_time_format), TimeFormatMode.entries, settings.timeFormat, { labels.getValue(it) }, preferences::setTimeFormat, layout)
+        }
+        item {
+            val labels = mapOf(
+                DateFormatMode.AUTO to autoLabel,
+                DateFormatMode.SPANISH to stringResource(R.string.display_date_spanish),
+                DateFormatMode.ENGLISH to stringResource(R.string.display_date_english),
+                DateFormatMode.AMERICAN to stringResource(R.string.display_date_american),
+            )
+            WrappedOptionChoices(stringResource(R.string.display_date_format), DateFormatMode.entries, settings.dateFormat, { labels.getValue(it) }, preferences::setDateFormat, layout)
+        }
         item {
             ToggleRow(
                 stringResource(R.string.display_3d_view),
@@ -162,7 +182,8 @@ internal fun DisplaySection(layout: LauncherLayout, width: Float, height: Float)
         }
         // Each scene has its own colour options; the driving zoom applies to both.
         if (settings.vehicleSceneMode == VehicleSceneMode.THREE_D) {
-            item { VehiclePaintRow(settings.vehiclePaint, preferences::setVehiclePaint, layout) }
+            item { VehiclePaintRow(settings, preferences, layout) }
+            item { FloorColorRow(settings, preferences, layout) }
         } else {
             item { VehicleColorRowCompact(settings.vehicleColorMode, preferences::setVehicleColorMode, layout) }
         }
@@ -481,6 +502,7 @@ internal fun AdvancedDetail(
     width: Float,
     height: Float,
 ) {
+    val formats = rememberDisplayFormats()
     val context = LocalContext.current
     val preferences = remember(context) { DashboardPreferences.get(context) }
     val settings by preferences.state.collectAsStateWithLifecycle()
@@ -533,7 +555,7 @@ internal fun AdvancedDetail(
             osm.lastError?.let { MetricRow(stringResource(R.string.adv_osm_last_error), it.text(), stringResource(R.string.adv_osm_cache_kept), layout) }
             osm.road?.let { road ->
                 MetricRow(stringResource(R.string.adv_road_found), road.name ?: road.reference ?: road.highway, stringResource(R.string.adv_distance_m, "%.0f".format(road.distanceMeters)), layout)
-                MetricRow(stringResource(R.string.adv_osm_limit), road.maxSpeedKmh?.let { "$it km/h" } ?: stringResource(R.string.adv_no_maxspeed), stringResource(R.string.adv_way, road.wayId.toString()), layout)
+                MetricRow(stringResource(R.string.adv_osm_limit), road.maxSpeedKmh?.let { formats.speedText(it) } ?: stringResource(R.string.adv_no_maxspeed), stringResource(R.string.adv_way, road.wayId.toString()), layout)
             }
         } }
     }
@@ -725,18 +747,54 @@ private fun VehicleColorRowCompact(selected: DashboardVehicleColorMode, onSelect
 }
 
 @Composable
-private fun VehiclePaintRow(selected: Vehicle3dPaint, onSelected: (Vehicle3dPaint) -> Unit, layout: LauncherLayout) {
+private fun VehiclePaintRow(settings: DashboardSettings, preferences: DashboardPreferences, layout: LauncherLayout) {
     val colors = LocalDashboardColors.current
-    Column(modifier = Modifier.padding(vertical = layout.dp(8))) {
-        Text(stringResource(R.string.display_body_colour_3d), color = colors.primary, fontSize = layout.sp(10), fontWeight = FontWeight.Bold)
-        Vehicle3dPaint.entries.chunked(4).forEach { row ->
-            Row(
-                modifier = Modifier.padding(top = layout.dp(3)),
-                horizontalArrangement = Arrangement.spacedBy(layout.dp(3)),
-            ) { row.forEach { paint -> Choice(stringResource(paint.label), paint == selected, layout) { onSelected(paint) } } }
+    val swatches = Vehicle3dPaint.entries.map { paint ->
+        val color = when (paint) {
+            Vehicle3dPaint.THEME -> colors.primary
+            Vehicle3dPaint.CUSTOM -> null
+            else -> Color(paint.argb ?: 0)
         }
+        ColorSwatch(paint.name, color, stringResource(paint.label))
     }
+    ColorSwatchRow(
+        title = stringResource(R.string.display_body_colour_3d),
+        swatches = swatches,
+        selectedKey = settings.vehiclePaint.name,
+        customArgb = settings.vehiclePaintCustomArgb,
+        onSwatch = { preferences.setVehiclePaint(Vehicle3dPaint.valueOf(it.key)) },
+        onCustom = preferences::setVehiclePaintCustom,
+        layout = layout,
+    )
 }
+
+@Composable
+private fun FloorColorRow(settings: DashboardSettings, preferences: DashboardPreferences, layout: LauncherLayout) {
+    val colors = LocalDashboardColors.current
+    val custom = settings.floorColorArgb?.takeIf { it !in FLOOR_PRESET_COLORS }
+    val swatches = buildList {
+        add(ColorSwatch(FLOOR_DEFAULT_KEY, if (colors.dark) Color(0xFF2A2C30) else Color(0xFFE6E6E6), stringResource(R.string.display_floor_default)))
+        FLOOR_PRESET_COLORS.forEach { add(ColorSwatch(it.toString(), Color(it), "")) }
+        add(ColorSwatch(FLOOR_CUSTOM_KEY, null, stringResource(R.string.paint_custom)))
+    }
+    val selectedKey = when {
+        settings.floorColorArgb == null -> FLOOR_DEFAULT_KEY
+        custom != null -> FLOOR_CUSTOM_KEY
+        else -> settings.floorColorArgb.toString()
+    }
+    ColorSwatchRow(
+        title = stringResource(R.string.display_floor_colour),
+        swatches = swatches,
+        selectedKey = selectedKey,
+        customArgb = settings.floorColorArgb ?: 0xFF808080.toInt(),
+        onSwatch = { preferences.setFloorColor(if (it.key == FLOOR_DEFAULT_KEY) null else it.key.toInt()) },
+        onCustom = { preferences.setFloorColor(it) },
+        layout = layout,
+    )
+}
+
+private const val FLOOR_DEFAULT_KEY = "default"
+private const val FLOOR_CUSTOM_KEY = "custom"
 
 @Composable
 private fun ZoomRowCompact(selected: DashboardDrivingZoomMode, onSelected: (DashboardDrivingZoomMode) -> Unit, layout: LauncherLayout) = OptionChoices(stringResource(R.string.display_driving_zoom), DashboardDrivingZoomMode.entries, selected, { it.label }, onSelected, layout)

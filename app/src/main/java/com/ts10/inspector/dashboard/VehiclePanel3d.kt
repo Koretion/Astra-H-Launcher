@@ -29,7 +29,7 @@ import com.ts10.inspector.ui.LauncherLayout
 import com.ts10.inspector.vehicle.VehicleSignalHub
 import com.ts10.inspector.vehicle.VehicleSignals
 import com.ts10.inspector.vehicle.can.SwWindowAction
-import com.ts10.inspector.vehicle3d.VEHICLE_3D_DRIVING_KMH
+import com.ts10.inspector.vehicle3d.ParkedViewState
 import com.ts10.inspector.vehicle3d.Vehicle3dFocus
 import com.ts10.inspector.vehicle3d.Vehicle3dOffscreenEngine
 import com.ts10.inspector.vehicle3d.Vehicle3dRoadObject
@@ -75,6 +75,7 @@ internal fun Vehicle3dDashboardView(
 @Composable
 internal fun Vehicle3dSceneFeeder(
     paintArgb: Int,
+    floorArgb: Int?,
     dark: Boolean,
     topView: Boolean,
     focus: VehicleSceneFocus,
@@ -88,7 +89,7 @@ internal fun Vehicle3dSceneFeeder(
     val localVision by LocalVisionObjectDetector.state.collectAsStateWithLifecycle()
     val forwardCamera = isForwardCameraPosition(cameraState.selectedPosition)
     val road = osmRoad.road
-    val parked = launcherState.speedKmh < VEHICLE_3D_DRIVING_KMH
+    val parked by ParkedViewState.parked.collectAsStateWithLifecycle()
     val focus3d = when (focus) {
         VehicleSceneFocus.ENGINE -> Vehicle3dFocus.ENGINE
         VehicleSceneFocus.CABIN -> Vehicle3dFocus.CABIN
@@ -97,6 +98,8 @@ internal fun Vehicle3dSceneFeeder(
     }.takeIf { parked } ?: Vehicle3dFocus.NONE
     val base = vehicle3dSceneInput(launcherState, signals, paintArgb, dark)
     val input = base.copy(
+        drivingView = !parked,
+        floorArgb = floorArgb,
         topView = topView,
         focus = focus3d,
         drivingZoom = drivingZoomMode.sceneScaleForSpeed(launcherState.speedKmh),

@@ -1,5 +1,7 @@
 package com.ts10.inspector.settings
 
+import com.ts10.inspector.ui.DisplayFormats
+import com.ts10.inspector.ui.rememberDisplayFormats
 import com.ts10.inspector.vehicle.can.profile.CanSignals
 import com.ts10.inspector.ui.text
 import com.ts10.inspector.R
@@ -54,6 +56,7 @@ import java.util.Locale
 
 @Composable
 internal fun EnergySection(layout: LauncherLayout, width: Float, height: Float) {
+    val formats = rememberDisplayFormats()
     val context = LocalContext.current
     val fuel by FuelRangeEstimator.state.collectAsStateWithLifecycle()
     val tracking by FuelTrackingRepository.state.collectAsStateWithLifecycle()
@@ -66,20 +69,17 @@ internal fun EnergySection(layout: LauncherLayout, width: Float, height: Float) 
         item { SectionHint(stringResource(R.string.energy_hint), layout) }
         item { SettingsCard(layout, width) {
             Text(stringResource(R.string.energy_fuel_type), color = LocalDashboardColors.current.primary, fontSize = layout.sp(9), fontWeight = FontWeight.Bold)
-            VehicleFuel.entries.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(layout.dp(6)), modifier = Modifier.padding(top = layout.dp(5))) {
-                    row.forEach { option ->
-                        Choice(stringResource(option.text), tracking.fuel == option, layout) { FuelTrackingRepository.setFuel(option) }
-                    }
-                }
+            val fuelLabels = VehicleFuel.entries.associateWith { stringResource(it.text) }
+            Row(modifier = Modifier.padding(top = layout.dp(5))) {
+                SegmentedControl(VehicleFuel.entries, tracking.fuel, { fuelLabels.getValue(it) }, { FuelTrackingRepository.setFuel(it) }, layout, wrap = true)
             }
         } }
         item { SettingsCard(layout, width) {
             MetricRow(stringResource(R.string.energy_fuel), fuel.fuelLiters?.let { String.format(Locale.getDefault(), "%.1f L", it) } ?: obd.fuelPercent?.let { "$it %" } ?: stringResource(R.string.common_pending), fuel.fuelSource.text(), layout)
             MetricRow(stringResource(R.string.energy_estimated_level), fuel.fuelPercent?.let { "$it %" } ?: stringResource(R.string.common_pending), stringResource(R.string.energy_level_source), layout)
             MetricRow(stringResource(R.string.energy_calibration), stringResource(R.string.energy_calibration_points, fuel.calibrationPointCount), stringResource(R.string.energy_calibration_hint), layout)
-            MetricRow(stringResource(R.string.energy_estimated_range), fuel.rangeKm?.let { "$it km" } ?: stringResource(R.string.common_pending), stringResource(R.string.energy_range_source), layout)
-            MetricRow(stringResource(R.string.energy_average_consumption), String.format(Locale.getDefault(), "%.1f L/100 km", fuel.averageLitersPer100Km), stringResource(R.string.energy_learned_km, fuel.learnedDistanceKm), layout)
+            MetricRow(stringResource(R.string.energy_estimated_range), fuel.rangeKm?.let { formats.distanceText(it, 0) } ?: stringResource(R.string.common_pending), stringResource(R.string.energy_range_source), layout)
+            MetricRow(stringResource(R.string.energy_average_consumption), formats.consumptionText(fuel.averageLitersPer100Km).let { if (formats.imperial) it else "$it km" }, formats.unitText(stringResource(R.string.energy_learned_km, formats.distance(fuel.learnedDistanceKm))), layout)
             MetricRow(stringResource(R.string.energy_sender_state), if (fuel.senderFaultSuspected) stringResource(R.string.energy_sender_bad) else stringResource(R.string.energy_sender_ok), if (fuel.senderFaultSuspected) stringResource(R.string.energy_sender_bad_hint) else stringResource(R.string.energy_sender_ok_hint), layout)
             MetricRow(
                 stringResource(R.string.energy_reserve),
@@ -111,7 +111,7 @@ internal fun EnergySection(layout: LauncherLayout, width: Float, height: Float) 
                 tracking.history.take(5).forEach { entry ->
                     val date = Instant.ofEpochMilli(entry.timestampMillis).atZone(ZoneId.systemDefault()).toLocalDate()
                     MetricRow(
-                        date.format(DateTimeFormatter.ofPattern("dd/MM/yy")),
+                        formats.date(date, shortYear = true),
                         entry.pricePerLiter?.let { String.format(Locale.getDefault(), "%.3f EUR/L", it) } ?: stringResource(R.string.energy_no_price),
                         String.format(Locale.getDefault(), "%.1f L%s", entry.liters, entry.stationName?.let { " · $it" }.orEmpty()),
                         layout,
@@ -129,7 +129,7 @@ internal fun EnergySection(layout: LauncherLayout, width: Float, height: Float) 
             )
             DetailNavigationRow(
                 stringResource(R.string.energy_install_date),
-                battery.installationDate?.let(::formatBatteryDate) ?: stringResource(R.string.energy_not_set),
+                battery.installationDate?.let { formatBatteryDate(it, formats) } ?: stringResource(R.string.energy_not_set),
                 layout,
             ) {
                 installationDateDraft = battery.installationDate ?: LocalDate.now()
@@ -162,7 +162,7 @@ internal fun EnergySection(layout: LauncherLayout, width: Float, height: Float) 
             )
             MetricRow(
                 stringResource(R.string.energy_estimated_replacement),
-                battery.replacementDate?.let(::formatBatteryDate) ?: stringResource(R.string.common_pending),
+                battery.replacementDate?.let { formatBatteryDate(it, formats) } ?: stringResource(R.string.common_pending),
                 stringResource(battery.statusText),
                 layout,
             )
@@ -372,6 +372,7 @@ private fun InlineBatteryDateEditor(
     onCancel: () -> Unit,
     onSave: () -> Unit,
 ) {
+    val formats = rememberDisplayFormats()
     val colors = LocalDashboardColors.current
     val today = LocalDate.now()
     Column(
@@ -381,7 +382,7 @@ private fun InlineBatteryDateEditor(
             .padding(horizontal = layout.dp(10), vertical = layout.dp(7)),
     ) {
         Text(
-            stringResource(R.string.energy_edit_install_date, formatBatteryDate(date)),
+            stringResource(R.string.energy_edit_install_date, formatBatteryDate(date, formats)),
             color = Color(0xFF2E9D50),
             fontSize = layout.sp(8),
             fontWeight = FontWeight.Bold,
@@ -411,11 +412,9 @@ private fun InlineBatteryDateEditor(
     }
 }
 
-internal fun formatBatteryDate(date: LocalDate): String =
-    date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault()))
+internal fun formatBatteryDate(date: LocalDate, formats: DisplayFormats): String = formats.date(date)
 
-internal fun formatMileage(kilometres: Double): String =
-    String.format(Locale.getDefault(), "%.1f km", kilometres)
+internal fun formatMileage(kilometres: Double, formats: DisplayFormats): String = formats.distanceText(kilometres)
 
 private fun batteryStatusColor(level: BatteryMaintenanceLevel, colors: DashboardColors): Color = when (level) {
     BatteryMaintenanceLevel.OK -> Color(0xFF2E9D50)

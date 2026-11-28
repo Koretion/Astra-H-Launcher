@@ -258,8 +258,7 @@ private fun ProfileButton(text: String, layout: LauncherLayout, enabled: Boolean
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .padding(end = layout.dp(6), top = layout.dp(4))
-            .background(colors.primary.copy(alpha = if (colors.dark) .08f else .05f), RoundedCornerShape(layout.dp(5)))
-            .border(layout.dp(1), if (enabled) colors.muted.copy(alpha = .3f) else colors.muted.copy(alpha = .12f), RoundedCornerShape(layout.dp(5)))
+            .teslaButton(colors, layout, enabled = enabled)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = layout.dp(10), vertical = layout.dp(8)),
     )
